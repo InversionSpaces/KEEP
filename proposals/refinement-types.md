@@ -107,8 +107,48 @@ repeat(42) {
 
 In this code snippet constructor argument of the `Offset` class is checked each iteration.
 But through static analysis it is possible to verify that the check is redundant. 
-The compiler can even possibly elide it, thus allowing to "thread" semantic correctness
+The compiler can even possibly elide it, thus allowing "threading" semantic correctness
 of a value through calls.
+
+# Proposed extension
+
+We propose to add a `Refinement` annotation which can be applied to inline value classes.
+Such classes are called *refinement classes*. Their single value parameter is called
+*underlying value*, and its type is called *underlying type*.
+
+Refinement classes could express the predicate of the refinement in terms of `require` call inside their `init` block.
+The argument of the `require` call is denoted as *predicate expression*. Predicate expression should have type `Boolean`
+and depend only on the underlying value.
+
+Example definition of a refinement class:
+
+```kotlin
+@Refinement
+@JvmInline
+value class PosInt(val value: Int) {
+    init { require(value > 0) }
+}
+```
+
+Predicate expression could not be arbitrary. A set of supported predicate expressions depends 
+on the underlying type. One underlying type could also potentially have different types of possible refinements
+that cannot be used together. For example, only comparisons with constants and logical conjunction of them could
+be allowed for underlying type `Int`, yielding refinements that correspond to integer intervals.
+
+In case of an unsupported predicate expression, a compilation warning should be issued on it to notify the user.
+The `Refinement` annotation then should have no further effect.
+
+Otherwise, the predicate expression is a valid refinement predicate. Then each call to the primary constructor of the
+refinement class should be analyzed statically to determine if the predicate holds for the constructor argument. There are
+three possible outcomes of such analysis:
+- It was deduced that predicate holds. If analysis is sound, the runtime check of the predicate might be erased.
+- It is unknown whether predicate holds or not. Then the runtime check should be left in place. A compilation warning might be issued to notify the user of a possible bug.
+- It was deduced that predicate does not hold. Then a compilation error should be issued.
+
+
+
+
+
 
 
 
