@@ -107,10 +107,12 @@ repeat(42) {
 
 In this code snippet constructor argument of the `Offset` class is checked each iteration.
 But through static analysis it is possible to verify that the check is redundant. 
-The compiler can even possibly elide it, thus allowing "threading" semantic correctness
-of a value through calls.
+The compiler can possibly erase it, thus maintaining semantic correctness
+of a value between calls.
 
 # Proposed extension
+
+## Refinement Classes
 
 We propose to add a `Refinement` annotation which can be applied to inline value classes.
 Such classes are called *refinement classes*. Their single value parameter is called
@@ -138,17 +140,69 @@ be allowed for underlying type `Int`, yielding refinements that correspond to in
 In case of an unsupported predicate expression, a compilation warning should be issued on it to notify the user.
 The `Refinement` annotation then should have no further effect.
 
-Otherwise, the predicate expression is a valid refinement predicate. Then each call to the primary constructor of the
+## Refining a value
+
+A value can be refined by calling a refinement class constructor. So each call to the primary constructor of the
 refinement class should be analyzed statically to determine if the predicate holds for the constructor argument. There are
 three possible outcomes of such analysis:
 - It was deduced that predicate holds. If analysis is sound, the runtime check of the predicate might be erased.
 - It is unknown whether predicate holds or not. Then the runtime check should be left in place. A compilation warning might be issued to notify the user of a possible bug.
 - It was deduced that predicate does not hold. Then a compilation error should be issued.
 
+The analysis is not expected to be interprocedural, but it should account for the context of a constructor call
+to support explicit constraint checks by the user and possibly more complicated cases.
 
+For example, in the following code the constructor call should be verified:
 
+```kotlin
+val v1 = readLine().toInt()!!
+var v2 = readLine().toInt()!!
+if (v1 > 0) {
+    while (v2 < 0) {
+        val pos = Pos(v1 - v2)
+        // ...
+    }
+}
+```
 
+## Mutable Values
 
+Note that mutable underlying values pose a great challenge for the proposed functionality.
+Mutability allows a value to stop satisfying the refinement predicate at some point, and this
+can be hard to track. 
 
+For example, one might try to introduce `NonEmptyList` like so:
 
+```kotlin
+@Refinement
+@JvmInline
+value class NonEmptyList<T>(val value: List<T>) {
+    init { require(value.isNotEmpty()) }
+}
+```
 
+But usage of this refinement class could lead to errors:
+
+```kotlin
+val list = mutableListOf(42)
+val nel = NonEmptyList(list)
+emptyListSomewhereDeepInside(list)
+// Here nel.value is empty
+```
+
+Thus, usage of non-deeply-immutable types for underlying values should be prohibited.
+
+# Implementation
+
+We propose to implement described functionality as intraprocedural control- and data-flow analysis.
+It can be based on the CDFA framework already existing in the Kotlin compiler and delivered as
+a Kotlin compiler plugin. 
+
+We believe this approach to have several benefits:
+- CDFA has better performance compared to SMT-solvers-based solutions. It is more important for practical applications than completeness offered by SMT solvers.
+- Compiler code reusage greatly simplifies development of this feature. No need to develop standalone tools.
+- Form of a compiler plugin makes this functionality an explicit opt-in.
+
+However, it has disadvantages as well:
+- CDFA does not have the generality of SMT-solvers. Each kind of analysis should be developed separately.
+- At the moment, the corresponding API of the Kotlin compiler is unstable, so maintenance of the solution might require a lot of rewrites.
