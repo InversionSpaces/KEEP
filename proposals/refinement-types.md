@@ -26,6 +26,7 @@ to specify more precise constraints on values.
 - [Challenges](#challenges)
   - [Subtyping of Refinements](#subtyping-of-refinements)
   - [Refinement Parameters](#refinement-parameters)
+- [Q&A]()
 - [Related Work](#related-work)
   - [Arrow Analysis](#arrow-analysis)
   - [Liquid Haskell](#liquid-haskell)
@@ -272,6 +273,21 @@ value class IntInRange<a : Int, b : Int>( // pseudo-syntax
 typealias Pos = IntInRage<1, Integer.MAX_VALUE>
 typealias NonNeg = IntInRage<0, Integer.MAX_VALUE>
 ```
+
+# Q&A
+
+### Why extend inline value classes specifically?
+
+Inline value classes where chosen as a base for refinement classes because:
+- They impose the restriction of a single value parameter that fits well with desired refinement classes behavior
+- They might be represented in runtime as just the underlying value in some cases when compiler optimization is applicable
+
+### Why not integrate with smartcasts?
+
+For any non-null type $T$ the following equality can be considered: $T = RT(T, v \rightarrow v \neq null)$. 
+Similarly, for `interface I` and `class S : I`, $S = RT(T, v \rightarrow v \text{ is } S)$. Thus, smartcasts could
+be regarded as a limited refinement type deduction from context. We discussed the possibility to extend this feature
+to support more predicates. However, we rejected this idea because it seems to be too major and intrusive language change.
 
 # Related work
 
