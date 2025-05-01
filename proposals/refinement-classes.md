@@ -161,9 +161,9 @@ The `Refinement` annotation then should have no further effect.
 A value can be refined by calling a refinement class constructor. So each call to the primary constructor of the
 refinement class should be analyzed statically to determine if the predicate holds for the constructor argument. There are
 three possible outcomes of such analysis:
-- It was deduced that predicate holds. If analysis is sound, the runtime check of the predicate might be erased.
-- It is unknown whether predicate holds or not. Then the runtime check should be left in place. A compilation warning might be issued to notify the user of a possible bug.
-- It was deduced that predicate does not hold. Then a compilation error should be issued.
+- It was deduced that predicate holds. If analysis is sound, the runtime check of the predicate might be erased
+- It is unknown whether predicate holds or not. Then the runtime check should be left in place. A compilation warning might be issued to notify the user of a possible bug
+- It was deduced that predicate does not hold. Then a compilation error should be issued
 
 The analysis is not expected to be interprocedural, but it should account for the context of a constructor call
 to support explicit constraint checks by the user and possibly more complicated cases.
@@ -215,13 +215,13 @@ It can be based on the CDFA framework already existing in the Kotlin compiler an
 a Kotlin compiler plugin. 
 
 We believe this approach to have several benefits:
-- CDFA has better performance compared to SMT-solvers-based solutions. It is more important for practical applications than completeness offered by SMT solvers.
-- Compiler code reusage greatly simplifies development of this feature. No need to develop standalone tools.
-- Form of a compiler plugin makes this functionality an explicit opt-in.
+- CDFA has better performance compared to SMT-solvers-based solutions. It is more important for practical applications than completeness offered by SMT solvers
+- Compiler code reusage greatly simplifies development of this feature. No need to develop standalone tools
+- Form of a compiler plugin makes this functionality an explicit opt-in
 
 However, it has disadvantages as well:
-- CDFA does not have the generality of SMT-solvers. Each kind of analysis should be developed separately.
-- At the moment, the corresponding API of the Kotlin compiler is unstable, so maintenance of the solution might require a lot of rewrites.
+- CDFA does not have the generality of SMT-solvers. Each kind of analysis should be developed separately
+- At the moment, the corresponding API of the Kotlin compiler is unstable, so maintenance of the solution might require a lot of rewrites
 
 # Challenges
 
