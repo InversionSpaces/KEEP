@@ -1,4 +1,4 @@
-# Refinement Types
+# Refinement Classes
 
 * **Type**: Design proposal
 * **Author**: Mikhail Vorobev
@@ -17,7 +17,7 @@ to specify more precise constraints on values.
 - [Abstract](#abstract)
 - [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
-  - [Refinement Types](#refinement-types-1)
+  - [Refinement Types](#refinement-types)
   - [Motivational Example](#motivational-example)
 - [Proposed Extension](#proposed-extension)
   - [Refinement Classes](#refinement-classes)
