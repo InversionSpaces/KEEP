@@ -14,7 +14,22 @@ to specify more precise constraints on values.
 
 # Table of Contents
 
-TBD
+- [Abstract](#abstract)
+- [Table of Contents](#table-of-contents)
+- [Introduction](#introduction)
+  - [Refinement Types](#refinement-types)
+  - [Motivational Example](#motivational-example)
+- [Proposed Extension](#proposed-extension)
+  - [Refinement Classes](#refinement-classes)
+  - [Refining a Value](#refining-a-value)
+  - [Mutable Values](#mutable-values)
+- [Challenges](#challenges)
+  - [Subtyping of Refinements](#subtyping-of-refinements)
+  - [Refinement Parameters](#refinement-parameters)
+- [Related Work](#related-work)
+  - [Arrow Analysis](#arrow-analysis)
+  - [Liquid Haskell](#liquid-haskell)
+  - [Scala Refined Library](#scala-refined-library)
 
 # Introduction
 
