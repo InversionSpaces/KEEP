@@ -74,7 +74,7 @@ suspend fun getBrokerMessages(
     offset: Int,
 ): MessageBatch {
     if (tag.isEmpty()) {
-        throw IllegalArgumentException("Invalid tag: $tag")
+        throw IllegalArgumentException("Invalid empty tag")
     }
     // Same for other parameters
 }
