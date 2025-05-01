@@ -207,6 +207,57 @@ However, it has disadvantages as well:
 - CDFA does not have the generality of SMT-solvers. Each kind of analysis should be developed separately.
 - At the moment, the corresponding API of the Kotlin compiler is unstable, so maintenance of the solution might require a lot of rewrites.
 
+# Challenges
+
+## Subtyping of Refinements
+
+It is natural to incorporate refinement types into the subtyping relation in the following way:
+$RT(T, p) <: RT(S, q)$ if $T <: S$ and $\forall v \in T: p(v) \Rightarrow q(v)$. However, checking 
+implication on predicates is a hard task in practice, especially without SMT solvers. Also, this 
+subtyping rule is more of a structural kind and feels off for Kotlin nominal subtyping.
+
+User can still define explicit conversions between refinement classes. Analysis might verify
+such conversion, but if it fails, the user takes responsibility.
+
+For example:
+
+```kotlin
+@Refinement
+@JvmInline
+value class NonNeg(val value: Int) {
+    init { require(value >= 0) }
+}
+
+@Refinement
+@JvmInline
+value class Pos(val value: Int) {
+    init { require(value > 0) }
+    
+    // Deduced to be correct
+    fun toNonNeg(): NonNeg = NonNeg(value)
+}
+```
+
+## Refinement Parameters
+
+Unfortunately, the proposed design does not provide the possibility to create general, parametrized refinements.
+This can lead low code reusage and a lot of boilerplate code for refinement classes.
+
+For example, something similar to the following code is unreachable:
+
+```kotlin
+@Refinement
+@JvmInline
+value class IntInRange<a : Int, b : Int>( // pseudo-syntax
+    val value: Int
+) {
+    init { require(value >= a && value <= b) }
+}
+
+typealias Pos = IntInRage<1, Integer.MAX_VALUE>
+typealias NonNeg = IntInRage<0, Integer.MAX_VALUE>
+```
+
 # Related work
 
 ## Arrow analysis
