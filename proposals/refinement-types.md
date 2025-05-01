@@ -17,7 +17,7 @@ to specify more precise constraints on values.
 - [Abstract](#abstract)
 - [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
-  - [Refinement Types](#refinement-types)
+  - [Refinement Types](#refinement-types-1)
   - [Motivational Example](#motivational-example)
 - [Proposed Extension](#proposed-extension)
   - [Refinement Classes](#refinement-classes)
