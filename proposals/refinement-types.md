@@ -206,3 +206,39 @@ We believe this approach to have several benefits:
 However, it has disadvantages as well:
 - CDFA does not have the generality of SMT-solvers. Each kind of analysis should be developed separately.
 - At the moment, the corresponding API of the Kotlin compiler is unstable, so maintenance of the solution might require a lot of rewrites.
+
+# Related work
+
+## Arrow analysis
+
+Arrow analysis Kotlin compiler plugin also implements static analysis for value constraints
+in Kotlin code. Our proposal bears great resemblance to class invariants found in arrow analysis.
+However, arrow analysis is based on SMT solvers and thus lacks performance for practical applications.
+Also, it was not ported to the K2 compiler for the moment.
+
+## Liquid Haskell
+
+Liquid Haskell is arguably the most prominent implementation of refinement types for a general-purpose 
+programming language. However, it is based on SMT solvers too. It also requires a lot of annotations
+from the user written in a specific sublanguage.
+
+## Scala Refined Library
+
+Scala refined library is an interesting implementation of refinement types as it does not
+require any external tools or even compiler plugins. It heavily relies on the following features of Scala, which are mostly 
+unavailable in Kotlin:
+- Intersection types
+- Literal types
+- Inductive typeclass instance deduction
+- Powerful macro system
+
+Refinement types are modeled as intersection types. For example, `Int` refined with a range can be expressed
+as type `Int && InRange[0, 100]` (Here `0` and `100` are literal types, arguments to generic class `InRange`).
+This approach has several benefits:
+- Refinements are lightweight typetags that exist only in compile time
+- Refined value can be used where value of the underlying type is expected. This follows from subtyping rules of intersection types
+- Subtyping is extended to support refinement types. For example, `InRange[0, 10] <: InRange[0, 100]` because first is a strictly stronger refinement than second. This is achieved through a combination of macros and typeclass deduction. User can define inference rules for custom refinements through typeclass instances
+
+Macros and typeclass deduction are known to negatively affect scala compilation time. However, this approach is
+probably still more performant than the use of SMT solvers.
+
