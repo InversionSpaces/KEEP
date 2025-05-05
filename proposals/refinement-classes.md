@@ -218,18 +218,25 @@ Thus, usage of non-deeply-immutable types for underlying values should be prohib
 
 # Implementation
 
-We propose to implement described functionality as intraprocedural control- and data-flow analysis.
-It can be based on the CDFA framework already existing in the Kotlin compiler and delivered as
-a Kotlin compiler plugin. 
+Many existing implementations of refinement types are based on SMT solvers (however, there are other approaches,
+for more info see [related work](#related-work)). But we propose to implement described functionality 
+as intraprocedural control- and data-flow analysis, separate for each refinement kind. For example,
+`Offset` and `BatchSize` refinement from [motivational example](#motivational-example) could be supported
+by classical interval analysis for integers.
+
+We also propose to use existing CDFA facilities already presented in the Kotlin compiler 
+and deliver the solution as a compiler plugin.
 
 We believe this approach to have several benefits:
 - CDFA has better performance compared to SMT-solvers-based solutions. It is more important for practical applications than completeness offered by SMT solvers
 - Compiler code reusage greatly simplifies development of this feature. No need to develop standalone tools
-- Form of a compiler plugin makes this functionality an explicit opt-in
+- Form of a compiler plugin makes this functionality an explicit opt-in and leaves the development of the solution relatively independent from the compiler development
 
 However, it has disadvantages as well:
 - CDFA does not have the generality of SMT-solvers. Each kind of analysis should be developed separately
 - At the moment, the corresponding API of the Kotlin compiler is unstable, so maintenance of the solution might require a lot of rewrites
+
+As a proof of concept, we developed a K2 compiler plugin which supports positive-zero-negative integer refinement.
 
 # Challenges
 
@@ -267,7 +274,7 @@ value class Pos(val value: Int) {
 Unfortunately, the proposed design does not provide the possibility to create general, parametrized refinements.
 This can lead low code reusage and a lot of boilerplate code for refinement classes.
 
-For example, something similar to the following code is unreachable:
+For example, something similar to the following code is unachievable:
 
 ```kotlin
 @Refinement
@@ -286,16 +293,30 @@ typealias NonNeg = IntInRage<0, Integer.MAX_VALUE>
 
 ### Why extend inline value classes specifically?
 
-Inline value classes where chosen as a base for refinement classes because:
+Inline value classes were chosen as a base for refinement classes because:
 - They impose the restriction of a single value parameter that fits well with desired refinement classes behavior
 - They might be represented in runtime as just the underlying value in some cases when compiler optimization is applicable
 
 ### Why not integrate with smartcasts?
 
-For any non-null type $T$ the following equality can be considered: $T = RT(T, v \rightarrow v \neq null)$. 
-Similarly, for `interface I` and `class S : I`, $S = RT(T, v \rightarrow v \text{ is } S)$. Thus, smartcasts could
-be regarded as a limited refinement type deduction from context. We discussed the possibility to extend this feature
-to support more predicates. However, we rejected this idea because it seems to be too major and intrusive language change.
+For any non-null type $T$ the following equality can be considered: $T = RT(T?, v \rightarrow v \neq null)$. 
+Similarly, for `interface I` and `class S : I`, $S = RT(T, v \rightarrow v \text{ is } S)$. 
+
+Thus, smartcasts like this could be regarded as a limited refinement type deduction from context:
+
+```kotlin
+val v: Int? = ...
+if (v == null) return
+// here v is Int
+
+val v: Base = ...
+if (v !is Derived) return
+// here v is Derived
+```
+
+We discussed the possibility to extend this feature to support more predicates. But we rejected it because 
+it seems to be too major and intrusive language change. However, the proposed implementation can reuse 
+the compiler code that is responsible for smartcasts.
 
 # Related work
 
