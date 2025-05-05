@@ -37,12 +37,12 @@ to specify more precise constraints on values.
 ## Refinement types
 
 A refinement type $RT(T, p)$ is a type that narrows values of type $T$ to those that satisfy
-the predicate $p$. In other words, values of type $RT(T, p)$ are those and only those values of type $T$
+the predicate $p$. In other words, values of type $RT(T, p)$ are those and only those values $v$ of type $T$
 for which $p(v)$ is $true$. For example, we can define a type of positive integers as 
 $Pos = RT(Int, v \rightarrow v > 0)$.
 
-Refinement types are well suited for expressing pre- and post-conditions for functions calls
-by encoding constraints into the types of arguments and return values
+Refinement types are well suited for expressing pre- and post-conditions for functions
+by encoding constraints into the types of arguments and return values.
 
 Note that for a value to be of a refinement type is a semantic property and thus might
 depend on the context of an execution. For example, if we have `val v: Int`, then in the 
@@ -105,10 +105,18 @@ suspend fun getBrokerMessages(
 ```
 
 This gives us a few benefits. Firstly, now it is impossible to accidentally confuse `batchSize`
-and `offset` on the call site. But more importantly, pre-conditions for a call are expressed in
-the signature of the function. Verification still happens, only now on the call-site.
+and `offset` on the call site as they have distinct types. But more importantly, pre-conditions for parameters of the function are expressed 
+directly in the signature of the function, instead of, for example, some combination of documentation 
+and checks inside the function.
 
-Let's consider the usage of this function:
+Also, now the user is forced to perform validation on the call site by constructing a value 
+of the demanded type. However, if a lot of values are given semantic constraints like this,
+it will soon become as easy to overlook potential violations of contracts as previously without
+this change. But note that constraints are now given in some uniform way, so an idea arises: 
+maybe the compiler can help by verifying constraints statically and warning the user only on
+possible violations? This KEEP develops this idea.
+
+Let's also consider the following usage of the function:
 
 ```kotlin
 val tag: Tag = ...
@@ -122,9 +130,9 @@ repeat(42) {
 ```
 
 In this code snippet constructor argument of the `Offset` class is checked each iteration.
-But through static analysis it is possible to verify that the check is redundant. 
+But through static analysis it might be possible to verify that the check is redundant. 
 The compiler can possibly erase it, thus maintaining semantic correctness
-of a value between calls.
+of a value between calls and, in the best case, subtly improve performance.
 
 # Proposed extension
 
