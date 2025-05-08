@@ -264,7 +264,7 @@ value class NonNeg(val value: Int) {
 value class Pos(val value: Int) {
     init { require(value > 0) }
     
-    // Deduced to be correct
+    // Deduced to be correct, runtime check might be eliminated during compilation
     fun toNonNeg(): NonNeg = NonNeg(value)
 }
 ```
