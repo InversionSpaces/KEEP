@@ -23,6 +23,7 @@ to specify more precise constraints on values.
   - [Refinement Classes](#refinement-classes)
   - [Refining a Value](#refining-a-value)
   - [Mutable Values](#mutable-values)
+- [Implementation](#implementation)
 - [Challenges](#challenges)
   - [Subtyping of Refinements](#subtyping-of-refinements)
   - [Refinement Parameters](#refinement-parameters)
