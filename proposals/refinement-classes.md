@@ -272,7 +272,7 @@ value class Pos(val value: Int) {
 ## Refinement Parameters
 
 Unfortunately, the proposed design does not provide the possibility to create general, parametrized refinements.
-This can lead low code reusage and a lot of boilerplate code for refinement classes.
+This can lead to low code reusage and a lot of boilerplate code for refinement classes.
 
 For example, something similar to the following code is unachievable:
 
