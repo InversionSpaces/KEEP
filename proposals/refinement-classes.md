@@ -230,13 +230,21 @@ and deliver the solution as a compiler plugin.
 We believe this approach to have several benefits:
 - CDFA has better performance compared to SMT-solvers-based solutions. It is more important for practical applications than completeness offered by SMT solvers
 - Compiler code reusage greatly simplifies development of this feature. No need to develop standalone tools
-- Form of a compiler plugin makes this functionality an explicit opt-in and leaves the development of the solution relatively independent from the compiler development
+- Form of a compiler plugin makes this functionality an explicit opt-in and leaves the development of the solution relatively independent of the compiler development
 
 However, it has disadvantages as well:
-- CDFA does not have the generality of SMT-solvers. Each kind of analysis should be developed separately
+- CDFA does not have the generality of SMT-solvers. Each kind of refinement should be developed separately
 - At the moment, the corresponding API of the Kotlin compiler is unstable, so maintenance of the solution might require a lot of rewrites
 
-As a proof of concept, we developed a K2 compiler plugin which supports positive-zero-negative integer refinement.
+Elaborating on the first point above, to introduce a new refinement (e.g., intervals for integer values), one should define and implement:
+- Corresponding lattice (e.g., interval lattice)
+- Corresponding monotone transfer function, which usually requires:
+- - Abstract evaluation of operations on the lattice (e.g., arithmetic operations)
+- - Abstract interpretation of conditions in context (e.g., `if (v > 0) { ... }`)
+- Appropriate widening and narrowing if the lattice is not of finite height
+
+As a proof of concept, we developed a K2 compiler plugin which supports interval refinement for integer values.
+Examples of supported refinements and verified code can be found in [Appendix A](#appendix-a-prototype-plugin-capabilities).
 
 # Challenges
 
@@ -377,3 +385,7 @@ An ability for a refinement type to depend on the context of its definition. For
 ```kotlin
 fun increment(x: Int) : RT(Int) { it == v + 1 } = x + 1
 ```
+
+# Appendix A: Prototype Plugin Capabilities
+
+TBD
