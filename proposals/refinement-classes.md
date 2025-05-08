@@ -323,20 +323,20 @@ the compiler code that is responsible for smartcasts.
 
 ## Arrow analysis
 
-Arrow analysis Kotlin compiler plugin also implements static analysis for value constraints
+[Arrow analysis Kotlin compiler plugin](https://arrow-kt.io/ecosystem/analysis/) also implements static analysis for value constraints
 in Kotlin code. Our proposal bears great resemblance to class invariants found in arrow analysis.
 However, arrow analysis is based on SMT solvers and thus lacks performance for practical applications.
 Also, it was not ported to the K2 compiler for the moment.
 
 ## Liquid Haskell
 
-Liquid Haskell is arguably the most prominent implementation of refinement types for a general-purpose 
+[Liquid Haskell](https://ucsd-progsys.github.io/liquidhaskell/) is arguably the most prominent implementation of refinement types for a general-purpose 
 programming language. However, it is based on SMT solvers too. It also requires a lot of annotations
 from the user written in a specific sublanguage.
 
 ## Scala Refined Library
 
-Scala refined library is an interesting implementation of refinement types as it does not
+[Scala refined library](https://github.com/fthomas/refined) is an interesting implementation of refinement types as it does not
 require any external tools or even compiler plugins. It heavily relies on the following features of Scala, which are mostly 
 unavailable in Kotlin:
 - Intersection types
@@ -354,3 +354,26 @@ This approach has several benefits:
 Macros and typeclass deduction are known to negatively affect scala compilation time. However, this approach is
 probably still more performant than the use of SMT solvers.
 
+## Comparison
+
+Here is a comparison table between the aforementioned solutions and our refinement classes proposal:
+
+|                                    |                       Arrow Analysis                       |                             Liquid Haskell                              |                          Scala Refined Library                           |                                     Refinement Classes                                      |
+|:-----------------------------------|:----------------------------------------------------------:|:-----------------------------------------------------------------------:|:------------------------------------------------------------------------:|:-------------------------------------------------------------------------------------------:|
+| Underlying Technology              |                        SMT solvers                         |                               SMT solvers                               |        Scala type system, typeclass instance deduction and macros        |                                Control and dataflow analysis                                |
+| Refining a Value                   |            ✅ Implicit using complete deduction             |                   ✅ Implicit using complete deduction                   |    ❌ Explicit with runtime checks <br/> (compile-time for constants)     | :warning: Explicit with partial safety deduction <br/> (possible runtime check elimination) |
+| Compatibility with Underlying Type |                         ✅ Implicit                         |                               ✅ Implicit                                |                                ✅ Implicit                                |                                    ❌ Explicit unpacking                                     |
+| Supported Predicates               | Expressions including booleans, numbers, object properties | Expressions including booleans, numbers and lifted functions (measures) |                                Arbitrary                                 |  Refinement dependent, generally simple expressions depending only on the underlying value  |
+| Parametrized Refinements           |                       ❌ Unsupported                        |                               ✅ Supported                               |                      ✅ Supported with literal types                      |                                        ❌ Unsupported                                        |
+| Dependent Refinements [*]          |                        ✅ Supported                         |                               ✅ Supported                               |           :warning: Limited support with scala dependent types           |                                        ❌ Unsupported                                        |
+| Refinements Subtyping              |    ✅ Supported through predicates implication deduction    |          ✅ Supported through predicates implication deduction           | :warning: Limited support through inductive user-defined inference rules |                        ❌ Unsupported, explicit conversions required                         |
+| Compilation Performance Cost       |                            High                            |                                  High                                   |                                 Moderate                                 |                                          Moderate                                           |
+| Runtime Performance Cost           |                            Zero                            |                                  Zero                                   |                        Moderate (runtime checks)                         |                   Moderate (for boxing and not eliminated runtime checks)                   |
+
+### [*] Dependent Refinements
+
+An ability for a refinement type to depend on the context of its definition. For example (in pseudocode):
+
+```kotlin
+fun increment(x: Int) : RT(Int) { it == v + 1 } = x + 1
+```
