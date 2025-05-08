@@ -241,7 +241,7 @@ Elaborating on the first point above, to introduce a new refinement (e.g., inter
 - Corresponding lattice (e.g., interval lattice)
 - Corresponding monotone transfer function, which usually requires:
 - - Abstract evaluation of operations on the lattice (e.g., arithmetic operations)
-- - Abstract interpretation of conditions in context (e.g., `if (v > 0) { ... }`)
+- - Abstract interpretation of conditions (e.g., `if (v > 0) { ... }`)
 - Appropriate widening and narrowing if the lattice is not of finite height
 
 As a proof of concept, we developed a K2 compiler plugin which supports interval refinement for integer values.
