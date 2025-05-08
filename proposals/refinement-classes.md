@@ -296,6 +296,7 @@ typealias NonNeg = IntInRage<0, Integer.MAX_VALUE>
 Inline value classes were chosen as a base for refinement classes because:
 - They impose the restriction of a single value parameter that fits well with desired refinement classes behavior
 - They might be represented in runtime as just the underlying value in some cases when compiler optimization is applicable
+- They provide a way to express refinement predicate without introducing any special syntax or logic. If a check is not decided to be eliminated, it will be executed in runtime following standard semantics of `init` block
 
 ### Why not integrate with smartcasts?
 
