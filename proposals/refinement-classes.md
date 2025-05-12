@@ -24,10 +24,11 @@ to specify more precise constraints on values.
   - [Refining a Value](#refining-a-value)
   - [Mutable Values](#mutable-values)
 - [Implementation](#implementation)
+- [Alternative Design](#alternative-design)
 - [Challenges](#challenges)
   - [Subtyping of Refinements](#subtyping-of-refinements)
   - [Refinement Parameters](#refinement-parameters)
-- [Q&A]()
+- [Q&A](#qa)
 - [Related Work](#related-work)
   - [Arrow Analysis](#arrow-analysis)
   - [Liquid Haskell](#liquid-haskell)
@@ -299,6 +300,51 @@ typealias Pos = IntInRage<1, Integer.MAX_VALUE>
 typealias NonNeg = IntInRage<0, Integer.MAX_VALUE>
 ```
 
+# Alternative Design
+
+Described design introduces a new type different from the underlying type (compiler could
+optimize inline value classes to the underlying type in runtime, but it is not guaranteed). A different approach was
+discussed where a refinement type is a subtype of the underlying type and has the same runtime representation. 
+Then some new syntax for defining a refinement type has to be introduced. For example:
+
+```kotlin
+// satisfies is a new keyword
+typealias RefinedT = T satisfies { <predicate> }
+// for example
+typealias Pos = Int satisfies { it > 0 }
+```
+
+All considerations of supported refinements and predicates from the proposed design apply here. Only now usages of values
+with type `T` (or some other refinement type with underlying type `T`) as values with type `RefinedT` should be analyzed 
+statically instead of constructor calls. For example:
+
+```kotlin
+fun usePos(p: Pos): Int = ...
+
+val v = ...
+if (v > 0) usePos(v) // should be deduced to be correct
+```
+
+After analysis all refinement types should be erased to corresponding underlying types. Now, instead of erasing predicate 
+checks for correct constructor calls, implementation should insert them where correctness was not deduced.
+
+In this setting, `is` might be supported for refinement types. Making `v is RefinedT` equivalent to `v is T && <predicate>(v)` 
+would align refinement types and smartcasts (see also [Why not integrate with smartcasts?](#why-not-integrate-with-smartcasts)).
+For example:
+
+```kotlin
+if (v is Pos) { // same as `v is Int && v > 0`
+    usePos(v)
+}
+```
+
+However, we did not pursue this approach for the following reasons:
+- While the proposed design builds on existing features, this approach requires new syntax and type system changes 
+- It is unclear whether it is possible to achieve such functionality with just a compiler plugin
+- This approach introduces separate structural subtyping on refinement types (see also [Subtyping of Refinements](#subtyping-of-refinements)). This does not fit well with Kotlin nominal subtyping
+- This approach introduces implicit conversions between distinct types. This goes against Kotlin preference for explicit conversions
+- It is unclear how those types should interact with existing type system features. For example, what types should be allowed for `T` in `fun <T : Pos> f(v: T): T`?
+
 # Q&A
 
 ### Why extend inline value classes specifically?
@@ -325,9 +371,9 @@ if (v !is Derived) return
 // here v is Derived
 ```
 
-We discussed the possibility to extend this feature to support more predicates. But we rejected it because 
-it seems to be too major and intrusive language change. However, the proposed implementation can reuse 
-the compiler code that is responsible for smartcasts.
+However, smartcasts do not change the runtime representation of the value. But the proposed design introduces a distinct 
+class for a refinement type, thus making it incompatible with smartcasts. Another approach which fits better with
+smartcasts is discussed in [Alternative Design](#alternative-design).
 
 # Related work
 
