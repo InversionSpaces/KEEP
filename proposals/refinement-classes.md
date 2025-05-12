@@ -32,6 +32,7 @@ to specify more precise constraints on values.
   - [Arrow Analysis](#arrow-analysis)
   - [Liquid Haskell](#liquid-haskell)
   - [Scala Refined Library](#scala-refined-library)
+- [Appendix A: Prototype Plugin Capabilities](#appendix-a-prototype-plugin-capabilities)
 
 # Introduction
 
@@ -389,4 +390,187 @@ fun increment(x: Int) : RT(Int) { it == v + 1 } = x + 1
 
 # Appendix A: Prototype Plugin Capabilities
 
-TBD
+Implementation note: the prototype plugin implements just one `FirFunctionCallChecker` which looks for constructor calls
+of classes that are annotated with specific annotation. The plugin resolves and analyzes the actual refinement class
+declaration on the first encountered constructor call. But this means that if the constructor is never called, the refinement
+class declaration is never analyzed or checked for correctness.
+
+## Integer Interval Refinement
+
+The prototype plugin supports interval refinements for integer values. Allowed refinement predicates are boolean expressions
+built from comparisons of underlying value with constants, logical conjunction, and disjunction. For example:
+
+```kotlin
+@JvmInline
+@Refinement
+value class Positive(val value: Int) {
+    init { require(0 < value) }
+}
+
+@JvmInline
+@Refinement
+value class From0To128(val value: Int) {
+    init { require(value >= 0 && value <= 128) }
+}
+```
+
+Complex expressions are supported, but they are required to yield a continuous interval:
+
+```kotlin
+@JvmInline
+@Refinement
+value class From0To64(val value: Int) {
+    init { require((value >= 0 && value <= 20) || (value < 65 && value > 5)) }
+}
+```
+
+If a predicate does not correspond to a continuous interval, a compilation error will be issued:
+
+```kotlin
+@JvmInline
+@Refinement
+value class Incorrect(val value: Int) {
+    // e: Unsupported predicate
+    init { require((value >= 0 && value <= 20) || (value <= 64 && value > 32)) }
+}
+```
+
+The plugin also warns the user if a refinement class defines an empty set of values:
+
+```kotlin
+@JvmInline
+@Refinement
+value class Empty(val value: Int) {
+    // w: Refinement predicate defines empty set of values
+    init { require(value >= 0 && value <= -20) }
+}
+```
+
+## Integer Intervals Analysis
+
+The plugin performs integer interval analysis on control flow graphs containing refinement class constructor call.
+It tries to gather information from context: `if`, `when` and `while` expressions, also from other refinement classes.
+For research purposes, it issues a warning in all cases: constructor call is totally correct, totally incorrect, or it 
+failed to deduce complete correctness. 
+For example:
+
+```kotlin
+val v = readLine()?.toInt()!!
+if (v > 80) { // Deduced interval: [81, +inf)
+    // w: Constructor call is correct
+    val t = Positive(v)
+}
+```
+
+```kotlin
+val v = readLine()?.toInt()!!
+if (v > 80) { // Deduced interval: [81, +inf)
+    when {
+        v < 100 -> { //  // Deduced interval: [81, 99]
+            // w: Constructor call is correct
+            val t = From0To128(v)
+        }
+    }
+}
+```
+
+```kotlin
+val v = readLine()?.toInt()!!
+if (v > 0 && v < 42) { // Deduced interval: [81, +inf)
+    // w: Constructor call is correct
+    val t1 = From0To64(v)
+    // w: Constructor call is correct
+    val t2 = From0To128(t1.value)
+}
+```
+
+```kotlin
+val v = readLine()?.toInt()!!
+while (v >= 0) { // Deduced interval: [0, +inf) 
+    // w: Failed to deduce correctness of constructor call 
+    val t = From0To64(v)
+}
+```
+
+```kotlin
+val v = readLine()?.toInt()!!
+while (v < 0) { // Deduced interval: (-inf, -1]
+    // w: Constructor call is incorrect
+    val t = From0To64(v)
+}
+```
+
+Conditions in context can contain other expressions as well:
+
+```kotlin
+val v = readLine()?.toInt()!!
+val s = "some string"
+if (v > 0 && s.isNotEmpty()) { // Deduced interval: [1, +inf) 
+    // w: Constructor call is correct
+    val t = Positive(v)
+}
+```
+
+At the moment `else` branch of `if` does not take into context negation of `if` condition. Similarly,
+negation of previous `when` branches conditions is not accounted for during analysis of a branch.
+
+Note that conditions are approximated to an interval. Thus, sometimes analysis could not deduce total incorrectness of
+a constructor call. For example:
+
+```kotlin
+val v = readLine()?.toInt()!!
+if ((v < 0 && v > -10) || (v > 64 && v < 100)) { // Deduced interval: [-9, 99]
+    // w: Failed to deduce correctness of constructor call 
+    val t1 = From0To64(v)
+}
+```
+
+The analysis supports constants and abstract evaluation of the following arithmetic operations: `+`, `-`, `*`. 
+For example:
+
+```kotlin
+val v1 = readLine()?.toInt()!!
+val v2 = readLine()?.toInt()!!
+val v3 = -42
+if (v1 > 100 && v2 > 0) {
+    // w: Constructor call is correct
+    val t = Positive(v1 * v2 - v3 + v2)
+}
+```
+
+Mutable variables are supported:
+
+```kotlin
+val v1 = readLine()?.toInt()!!
+var v2 = 42
+if (v1 > 0) {
+    v2 = v1
+}
+// w: Constructor call is correct
+val t = Positive(v2)
+```
+
+The analysis also implements simple widening, so it can deal with loops:
+
+```kotlin
+var v1 = readLine()?.toInt()!!
+var v2 = 0
+while (v1 > 1 && v1 < 100) {
+    v1 = v1 * 2
+    v2 = v2 + 1
+    // w: Constructor call is correct
+    val t = Positive(v2) // Deduced interval: [1, +inf)
+}
+```
+
+Currently, one of the most annoying flaws of the analysis is that it does not play well with lambda capture and 
+is not integrated with contracts. Thus, it often fails on idiomatic kotlin code. For example:
+
+```kotlin
+var v = 0
+repeat(10) {
+    v = v + 1
+    // w: Failed to deduce correctness of constructor call
+    val t = Positive(v)
+}
+```
