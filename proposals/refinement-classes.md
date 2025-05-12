@@ -448,10 +448,10 @@ value class Empty(val value: Int) {
 
 ## Integer Intervals Analysis
 
-The plugin performs integer interval analysis on control flow graphs containing refinement class constructor call.
-It tries to gather information from context: `if`, `when` and `while` expressions, also from other refinement classes.
-For research purposes, it issues a warning in all cases: constructor call is totally correct, totally incorrect, or it 
-failed to deduce complete correctness. 
+The plugin performs integer interval analysis on control flow graph containing refinement class constructor call.
+It tries to gather information from context: from `if`, `when` and `while` conditions, also from other refinement classes.
+For research purposes, it issues a warning in all cases: constructor call is correct, incorrect, or it 
+failed to deduce correctness. 
 For example:
 
 ```kotlin
