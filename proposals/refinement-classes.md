@@ -410,21 +410,69 @@ This approach has several benefits:
 Macros and typeclass deduction are known to negatively affect scala compilation time. However, this approach is
 probably still more performant than the use of SMT solvers.
 
+## Ada Language
+
+[Ada Programming Language](https://ada-lang.io/) is focused on developing reliable and correct software. It provides
+a handful of features for contract-driven development. Some of them, namely range types, [subtype predicates](http://ada-auth.org/standards/12rat/html/Rat12-2-5.html) and
+[type invariants](http://ada-auth.org/standards/12rat/html/Rat12-2-4.html), are quite similar to refinement types
+in the sense that they allow constraining values of types with predicates:
+- Range types, as the name suggests, allow constraining value to a specific range
+- Subtype predicates are divided into two flavors:
+- - Static predicates allow predicates only from a small sublanguage. In return, they get more support from the compiler
+- - Dynamic predicates allow any boolean expression as a predicate
+- Type invariants also allow any boolean expression
+
+All the predicates are checked in the runtime at specific boundaries, mostly at variable initializations and 
+procedure (or function) call and return. Such checks can be disabled completely with a compiler option.
+
+Below are example definitions. Type invariants differ from dynamic subtype predicates mostly in application scope 
+(they are intended for private types), so they are not examined here.
+
+```ada
+type Int7 is new Integer range 0..127;
+  
+subtype Positive is Integer
+    with Static_Predicate => Positive > 0;
+
+type Even is new Integer
+    with Dynamic_Predicate => Even mod 2 = 0; -- mod is not allowed in Static_Predicate
+```
+
+Note that despite the name, subtype predicates can be applied not only to subtypes, but also to new types.
+Difference between `subtype T is Integer` and `type T is new Integer` is that former is a subtype of `Integer` and
+can be used as such, while later requires an explicit conversion to `Integer`.
+
+Besides predicates for types, Ada supports [pre- and post-condition](http://ada-auth.org/standards/12rat/html/Rat12-2-3.html)
+declarations for functions. They are also checked in runtime on function call and return, if not disabled by a compiler option.
+For example:
+
+```ada
+function IntegerSquareRoot(X: Integer) return Integer is (...) -- implementation is omitted
+    with Pre => X >= 0,
+         Post => IntegerSquareRoot'Result * IntegerSquareRoot'Result <= X and 
+                (IntegerSquareRoot'Result + 1) * (IntegerSquareRoot'Result + 1) > X;
+```
+
+As you can see, the core language supports described features mostly in the form of optional runtime checks. 
+However, static analysis tools exist that take advantage of such specifications to actually prove the correctness of programs.
+See [SPARK Language](https://docs.adacore.com/spark2014-docs/html/ug/en/introduction.html) based on Ada.
+
 ## Comparison
 
 Here is a comparison table between the aforementioned solutions and our refinement classes proposal:
 
-|                                    |                       Arrow Analysis                       |                             Liquid Haskell                              |                          Scala Refined Library                           |                                     Refinement Classes                                      |
-|:-----------------------------------|:----------------------------------------------------------:|:-----------------------------------------------------------------------:|:------------------------------------------------------------------------:|:-------------------------------------------------------------------------------------------:|
-| Underlying Technology              |                        SMT solvers                         |                               SMT solvers                               |        Scala type system, typeclass instance deduction and macros        |                                Control and dataflow analysis                                |
-| Refining a Value                   |            ✅ Implicit using complete deduction             |                   ✅ Implicit using complete deduction                   |    ❌ Explicit with runtime checks <br/> (compile-time for constants)     | :warning: Explicit with partial safety deduction <br/> (possible runtime check elimination) |
-| Compatibility with Underlying Type |                         ✅ Implicit                         |                               ✅ Implicit                                |                                ✅ Implicit                                |                                    ❌ Explicit unpacking                                     |
-| Supported Predicates               | Expressions including booleans, numbers, object properties | Expressions including booleans, numbers and lifted functions (measures) |                                Arbitrary                                 |  Refinement dependent, generally simple expressions depending only on the underlying value  |
-| Parametrized Refinements           |                       ❌ Unsupported                        |                               ✅ Supported                               |                      ✅ Supported with literal types                      |                                        ❌ Unsupported                                        |
-| Dependent Refinements [*]          |                        ✅ Supported                         |                               ✅ Supported                               |           :warning: Limited support with scala dependent types           |                                        ❌ Unsupported                                        |
-| Refinements Subtyping              |    ✅ Supported through predicates implication deduction    |          ✅ Supported through predicates implication deduction           | :warning: Limited support through inductive user-defined inference rules |                        ❌ Unsupported, explicit conversions required                         |
-| Compilation Performance Cost       |                            High                            |                                  High                                   |                                 Moderate                                 |                                          Moderate                                           |
-| Runtime Performance Cost           |                            Zero                            |                                  Zero                                   |                        Moderate (runtime checks)                         |                   Moderate (for boxing and not eliminated runtime checks)                   |
+|                                    |                       Arrow Analysis                       |                             Liquid Haskell                              |                          Scala Refined Library                           |                        Ada Language                         |                                    Refinement Classes                                     |
+|:-----------------------------------|:----------------------------------------------------------:|:-----------------------------------------------------------------------:|:------------------------------------------------------------------------:|:-----------------------------------------------------------:|:-----------------------------------------------------------------------------------------:|
+| Underlying Technology              |                        SMT solvers                         |                               SMT solvers                               |        Scala type system, typeclass instance deduction and macros        |             Ada type system and other features              |                         Control and dataflow analysis, Kotlin FIR                         |
+| Refining a Value                   |                         ✅ Implicit                         |                               ✅ Implicit                                |                                ❌ Explicit                                |       ✅ Implicit or explicit (controlled by the user)       |                                        ❌ Explicit                                         |
+| Insuring Safety                    |                ✅ Complete static deduction                 |                       ✅ Complete static deduction                       |              ❌ Runtime checks (compile-time for constants)               |        ❌ Runtime checks (compile-time for constants)        |        :warning: Partial static deduction with possible runtime check elimination         |
+| Compatibility with Underlying Type |                         ✅ Implicit                         |                               ✅ Implicit                                |                                ✅ Implicit                                |       ✅ Implicit or explicit (controlled by the user)       |                                   ❌ Explicit unpacking                                    |
+| Supported Predicates               | Expressions including booleans, numbers, object properties | Expressions including booleans, numbers and lifted functions (measures) |                                Arbitrary                                 |                          Arbitrary                          | Refinement dependent, generally simple expressions depending only on the underlying value |
+| Parametrized Refinements           |                       ❌ Unsupported                        |                               ✅ Supported                               |                      ✅ Supported with literal types                      |              ✅ Supported with generic packages              |                                       ❌ Unsupported                                       |
+| Dependent Refinements [*]          |   ✅ Supported (in the form of pre- and post-conditions)    |                               ✅ Supported                               |           :warning: Limited support with scala dependent types           |    ✅ Supported (in the form of pre- and post-conditions)    |                                       ❌ Unsupported                                       |
+| Refinements Subtyping              |    ✅ Supported through predicates implication deduction    |          ✅ Supported through predicates implication deduction           | :warning: Limited support through inductive user-defined inference rules | :warning: Only explicit `subtype` definitions are supported |                       ❌ Unsupported, explicit conversions required                        |
+| Compilation Performance Cost       |                            High                            |                                  High                                   |                                 Moderate                                 |                          Moderate                           |                                         Moderate                                          |
+| Runtime Performance Cost           |                            Zero                            |                                  Zero                                   |                        Moderate (runtime checks)                         |                  Moderate (runtime checks)                  |                  Moderate (for boxing and not eliminated runtime checks)                  |
 
 ### [*] Dependent Refinements
 
