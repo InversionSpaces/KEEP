@@ -404,21 +404,58 @@ from the user written in a specific sublanguage.
 
 [Scala refined library](https://github.com/fthomas/refined) is an interesting implementation of refinement types as it does not
 require any external tools or even compiler plugins. It heavily relies on the following features of Scala, which are mostly 
-unavailable in Kotlin:
-- Intersection types
-- Literal types
-- Inductive typeclass instance deduction
-- Powerful macro system
+unavailable in Kotlin: intersection types, literal types, inductive typeclass instance deduction, powerful macro system.
 
-Refinement types are modeled as intersection types. For example, `Int` refined with a range can be expressed
-as type `Int && InRange[0, 100]` (Here `0` and `100` are literal types, arguments to generic class `InRange`).
-This approach has several benefits:
-- Refinements are lightweight typetags that exist only in compile time
-- Refined value can be used where value of the underlying type is expected. This follows from subtyping rules of intersection types
-- Subtyping is extended to support refinement types. For example, `InRange[0, 10] <: InRange[0, 100]` because first is a strictly stronger refinement than second. This is achieved through a combination of macros and typeclass deduction. User can define inference rules for custom refinements through typeclass instances
+The library actually supports any (possibly user-defined) representation for refinement types. Out of the box it 
+provides representations with intersection types and value classes (similar to those in Kotlin). For example, 
+`Int` refined with a lower bound can be expressed as type `Int && Greater[100]` (Here `100` is a literal type, 
+argument to generic class `Greater`). Alternatively, the same refinement can be represented as instance of
+`Refined[Int, Greater[100]]`, where `Refined` is `final class Refined[T, P] private (val value: T) extends AnyVal`.
+Both approaches share the following properties:
+- Refinements are lightweight: they exist only on the level of types in compile time. In the runtime only the underlying value is left
+- Refined value can be used where value of the underlying type is expected. For intersection types it follows from their semantics. In other cases, implicit conversion is inserted
+- Implicit weakening is supported. For example, `Refined[Int, Greater[100]]` can be used in place of `Refined[Int, Greater[0]]` because `Greater[100]` is a strictly stronger refinement than `Greater[0]`. This is achieved through a combination of macros, typeclass deduction, and implicit conversions. User can define inference rules for custom refinements through typeclass instances
 
-Macros and typeclass deduction are known to negatively affect scala compilation time. However, this approach is
-probably still more performant than the use of SMT solvers.
+Compile-time validation of refinements is supported for constant expressions, but otherwise refining a value always involves
+checking refinement predicate in the runtime. Macros and typeclass deduction are known to negatively affect scala compilation time. 
+However, this approach is probably still more performant than the use of SMT solvers.
+
+Below is an example of refinement definition:
+
+```scala
+// Define the refinement type itself
+final case class Greater[N](n: N)
+
+// Define actual refinement predicate by providing a ` Validate ` typeclass instance
+implicit def greaterValidate[T, N](implicit
+  wn: WitnessAs[N, T], // Require that `N` is subtype of `T`
+  nt: Numeric[T] // Require that the type `T` is a numeric type
+): Validate.Plain[T, Greater[N]] =
+  Validate.fromPredicate(
+    t => nt.gt(t, wn.snd), // Actual predicate implementation
+    t => s"($t > ${wn.snd})", 
+    Greater(wn.fst)
+  )
+
+// Define inference rule
+implicit def greaterInference[C, A, B](implicit
+  wa: WitnessAs[A, C],
+  wb: WitnessAs[B, C],
+  nc: Numeric[C]
+): Greater[A] ==> Greater[B] =
+  Inference(
+    nc.gt(wa.snd, wb.snd), // Actual implication condition
+    s"greaterInference(${wa.snd}, ${wb.snd})"
+  )
+
+// Now, to refine a value, we call a function that performs validation in the runtime
+// It returns `Left` with the error description in case validation fails
+val v: Int = ...
+val refinementResult: Either[String, Refined[Int, Greater[100]]] = refineV(v)
+val rv: Refined[Int, Greater[100]] = refinementResult.get()
+// We can weaken refinement implicitly
+val weakened: Refined[Int, Greater[0]] = rv
+```
 
 ## Ada Language
 
