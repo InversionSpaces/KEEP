@@ -300,6 +300,16 @@ typealias Pos = IntInRage<1, Integer.MAX_VALUE>
 typealias NonNeg = IntInRage<0, Integer.MAX_VALUE>
 ```
 
+To support this, we need the type system to allow manipulating values at the type level.
+We believe there are at least two ways to make it happen:
+- Introduce literal types to the type system so they can be used as generic type parameters. Note that they are tricky to support in the presence of JVM type erasure. For example, Scala supports retrieving value from a literal type with `given` instances (similar to context parameters in Kotlin) which constraints their usage
+- Introduce type operators (constructors) that support value parameters directly. This approach is similar to Liquid Haskell type aliases and Ada generic packages. However, this is usually implemented by generic instantiation (like C++ templates), which again does not fit well with JVM
+
+Those features are broad and not obvious to implement. Also, they are beneficial in many applications other than parametrized refinements.
+So we decided not to develop them here.
+
+For more context on technologies mentionet in this section, refer to [Related Work](#related-work).
+
 # Alternative Design
 
 Described design introduces a new type different from the underlying type (compiler could
