@@ -29,6 +29,7 @@ to specify more precise constraints on values.
 - [Challenges](#challenges)
   - [Subtyping of Refinements](#subtyping-of-refinements)
   - [Refinement Parameters](#refinement-parameters)
+  - [Dependent Refinements](#dependent-refinements)
 - [Q&A](#qa)
 - [Related Work](#related-work)
   - [Arrow Analysis](#arrow-analysis)
@@ -310,6 +311,50 @@ Those features are broad and not obvious to implement. Also, they are beneficial
 So we decided not to develop them here.
 
 For more context on technologies mentioned in this section, refer to [Related Work](#related-work).
+
+## Dependent Refinements
+
+After discussing parametrization of refinements by static values, we might imagine parametrizing them by runtime values.
+In other words, support dependent types, only limited to the form of refinement types.
+
+Note that if there was static parametrization, it would be already possible to "link" together refinements in one definition
+by imposing constraints with the same parameter on them.
+For example (here `N` is statically known integer):
+
+```kotlin
+fun <T, N : Int> find(list: ListOfSize<T, N>, value: T): IntInRange<-1, N> = ...
+```
+
+However, this would be of little use as it is possible to apply this function only
+to a list with statically known size. Otherwise, we could not "lift" list size to static level:
+
+```kotlin
+val list: List<Int> = ...
+find<Int, ???>(list) // no way to apply find
+```
+
+But refinement types are already associated with a predicate. We could allow this predicate to capture value from
+context as lambdas do. For demonstration, it is convenient to adopt notation from [Alternative Design](#alternative-design).
+For example:
+
+```kotlin
+fun <T> find(list: List<T>, value: T): Int satisfies { -1 <= it && it < list.size() } {
+    var index: Int = -1
+    // find the value
+    return index
+}
+```
+
+It is unclear what notation to use for return if explicit refining is adopted.
+If the return type is repeated - `return index as Int satisfies { -1 <= it && it < list.size() }` - it might denote 
+another refinement because `list.size()` might be changed during execution of the body.
+
+Such anonymous refinement definition should not actually capture `list`. It should be used only for
+static analysis and runtime check of the return value. However, implementation of the latter is unclear:
+again, `list` might change during execution of the body, so the compiler might be required to 
+evaluate and store the result of `list.size()` on entering the function.
+
+This functionality is similar to pre- and post-conditions of Ada (see [Related Work](#ada-language)).
 
 # Rationale
 
@@ -645,18 +690,10 @@ Here is a comparison table between the aforementioned solutions and our refineme
 | Compatibility with Underlying Type |                         ✅ Implicit                         |                               ✅ Implicit                                |                                ✅ Implicit                                |       ✅ Implicit or explicit (controlled by the user)       |                                   ❌ Explicit unpacking                                    |
 | Supported Predicates               | Expressions including booleans, numbers, object properties | Expressions including booleans, numbers and lifted functions (measures) |                                Arbitrary                                 |                          Arbitrary                          | Refinement dependent, generally simple expressions depending only on the underlying value |
 | Parametrized Refinements           |                       ❌ Unsupported                        |                               ✅ Supported                               |                      ✅ Supported with literal types                      |              ✅ Supported with generic packages              |                                       ❌ Unsupported                                       |
-| Dependent Refinements [*]          |   ✅ Supported (in the form of pre- and post-conditions)    |                               ✅ Supported                               |           :warning: Limited support with scala dependent types           |    ✅ Supported (in the form of pre- and post-conditions)    |                                       ❌ Unsupported                                       |
+| Dependent Refinements              |   ✅ Supported (in the form of pre- and post-conditions)    |                               ✅ Supported                               |           :warning: Limited support with scala dependent types           |    ✅ Supported (in the form of pre- and post-conditions)    |                                       ❌ Unsupported                                       |
 | Refinements Subtyping              |    ✅ Supported through predicates implication deduction    |          ✅ Supported through predicates implication deduction           | :warning: Limited support through inductive user-defined inference rules | :warning: Only explicit `subtype` definitions are supported |                       ❌ Unsupported, explicit conversions required                        |
 | Compilation Performance Cost       |                            High                            |                                  High                                   |                                 Moderate                                 |                          Moderate                           |                                         Moderate                                          |
 | Runtime Performance Cost           |                            Zero                            |                                  Zero                                   |                        Moderate (runtime checks)                         |                  Moderate (runtime checks)                  |                  Moderate (for boxing and not eliminated runtime checks)                  |
-
-### [*] Dependent Refinements
-
-An ability for a refinement type to depend on the context of its definition. For example (in pseudocode):
-
-```kotlin
-fun increment(x: Int) : RT(Int) { it == v + 1 } = x + 1
-```
 
 # Appendix A: Prototype Plugin Capabilities
 
