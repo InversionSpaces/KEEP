@@ -24,6 +24,7 @@ to specify more precise constraints on values.
   - [Refining a Value](#refining-a-value)
   - [Mutable Values](#mutable-values)
 - [Implementation](#implementation)
+- [Rationale](#rationale)
 - [Alternative Design](#alternative-design)
 - [Challenges](#challenges)
   - [Subtyping of Refinements](#subtyping-of-refinements)
@@ -308,7 +309,28 @@ We believe there are at least two ways to make it happen:
 Those features are broad and not obvious to implement. Also, they are beneficial in many applications other than parametrized refinements.
 So we decided not to develop them here.
 
-For more context on technologies mentionet in this section, refer to [Related Work](#related-work).
+For more context on technologies mentioned in this section, refer to [Related Work](#related-work).
+
+# Rationale
+
+We admit that the proposed above extension might feel verbose and inconvenient while offering no strict guarantees.
+For example, the user has to explicitly wrap values to refinement classes and unwrap them back.
+Below we provide our reasoning behind such design.
+
+It is hard to have a static analysis that is complete and performant enough for practical applications
+in non-trivial refinement domains. So our best hope is for it to be sound. That is why we did not want 
+to introduce new (especially implicit) execution semantics based on the analysis.
+
+On the other hand, we strived for a simple design that would not introduce changes to syntax, type system, and 
+other aspects of the language.
+
+Those considerations lead us to the design that is a combination of other Kotlin features 
+(see also [Why extend inline value classes specifically?](#why-extend-inline-value-classes-specifically)).
+The proposed implementation is an enhancement to what already could be expressed:
+it offers additional support for writing safe code and possible optimizations.
+At the same time, programs remain valid without it, relying on runtime checks.
+
+Somewhat opposite approach is discussed below in [Alternative Design](#alternative-design).
 
 # Alternative Design
 
