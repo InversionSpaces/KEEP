@@ -479,6 +479,20 @@ val rv: Refined[Int, Greater[100]] = refinementResult.get()
 val weakened: Refined[Int, Greater[0]] = rv
 ```
 
+Note also that there is the [iron library](https://github.com/Iltotore/iron) with much similar functionality.
+However, it supports scala 3 exclusively and uses its new features. 
+Refinement types are represented as opaque type aliases to the underlying type with type bounds:
+
+```scala
+/**
+ * An Iron type (refined).
+ *
+ * @tparam A the underlying type.
+ * @tparam C the predicate/constraint guarding this type.
+ */
+opaque type IronType[A, C] <: A = A
+```
+
 ## Ada Language
 
 [Ada Programming Language](https://ada-lang.io/) is focused on developing reliable and correct software. It provides
