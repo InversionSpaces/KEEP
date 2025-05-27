@@ -169,7 +169,7 @@ be allowed for underlying type `Int`, yielding refinements that correspond to in
 In case of an unsupported predicate expression, a compilation warning should be issued on it to notify the user.
 The `Refinement` annotation then should have no further effect.
 
-## Refining a value
+## Refining a Value
 
 A value can be refined by calling a refinement class constructor. So each call to the primary constructor of the
 refinement class should be analyzed statically to determine if the predicate holds for the constructor argument. There are
@@ -436,8 +436,51 @@ if (v > 0) {
 ```
 
 Implicit refining makes code rather hard to manage. Subtle code change might make static analysis fail and suddenly
-introduce a runtime check where there was none, and it is not indicated by code. 
-Or refining the type of function parameter might introduce runtime checks on all callsites.
+introduce a runtime check where there was none, and it is not indicated by code. For example, suppose an implementation
+has deduced that a runtime check is not needed in the following code:
+
+```kotlin
+fun usePos(p: PosImplicit) = ...
+
+var i = 0
+while (i < 42) {
+    usePos(i) // runtime check is not inserted
+    // a lot of code
+    i += 1
+}
+```
+
+But after a code change, analysis failed, so a check had to be inserted:
+
+```kotlin
+var i = 0
+while (i < 42) {
+    usePos(i) // runtime check inserted 
+    // a lot of code
+    i = complicatedIndexCalculation(i)
+}
+```
+
+Compare this to the same code written using refinement classes, where a constructor call indicates a possibility
+of a runtime check, no matter the result of an analysis:
+
+```kotlin
+@Refinement
+value class Pos(val value: Int) {
+  init { require(value > 0) }
+}
+
+fun usePos(p: Pos) = ...
+
+var i = 0
+while (i < 42) {
+    usePos(Pos(i)) // runtime check left in place 
+    // a lot of code
+    i = complicatedIndexCalculation(i)
+}
+```
+
+Also, refining a function parameter type might introduce runtime checks on all callsites if refining is implicit.
 
 In the case of explicit refining, explicit conversions to a refinement subtype should be analyzed statically, 
 much like for refinement classes.
@@ -514,7 +557,7 @@ We did not pursue this approach for the following reasons:
 - While the refinement classes are built on existing features, refinement subtypes require new syntax and type system changes 
 - It seems impossible to achieve such functionality with just a compiler plugin
 - If introduced, structural subtyping on refinement subtypes does not fit well with Kotlin nominal subtyping
-- If introduced, implicit conversions between distinct refinement subtypes would be against Kotlin preference for explicit conversions 
+- If introduced, implicit refining and conversions between refinement subtypes would make code harder to manage
 - It is unclear how refinement subtypes should interact with existing type system features. 
 For example, if structural subtyping is introduced, what types should be allowed for `T` in `fun <T : Pos> f(v: T): T`?
 Being a subtype of `Pos` is being at-least-as-strong refinement, 
