@@ -28,7 +28,7 @@ to specify more precise constraints on values.
 - [Alternative Design](#alternative-design)
 - [Challenges](#challenges)
   - [Subtyping of Refinements](#subtyping-of-refinements)
-  - [Refinement Parameters](#refinement-parameters)
+  - [Parametrized Refinements](#refinement-parameters)
   - [Dependent Refinements](#dependent-refinements)
 - [Q&A](#qa)
 - [Related Work](#related-work)
@@ -282,7 +282,7 @@ value class Pos(val value: Int) {
 }
 ```
 
-## Refinement Parameters
+## Parametrized Refinements
 
 Unfortunately, the proposed design does not provide the possibility to create general, parametrized refinements.
 This can lead to low code reusage and a lot of boilerplate code for refinement classes.
