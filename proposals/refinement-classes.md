@@ -20,7 +20,7 @@ to specify more precise constraints on values.
   - [Refinement Types](#refinement-types)
   - [Motivational Example](#motivational-example)
 - [Proposed Extension](#proposed-extension)
-  - [Refinement Classes](#refinement-classes)
+  - [Refinement Classes](#refinement-classes-1)
   - [Refining a Value](#refining-a-value)
   - [Mutable Values](#mutable-values)
 - [Implementation](#implementation)
@@ -381,10 +381,12 @@ Somewhat opposite approach is discussed below in [Alternative Design](#alternati
 
 ## Representation
 
-The proposed design introduces a new type different from the underlying type (compiler could
+Refinement classes introduce a new type different from the underlying type (compiler could
 optimize inline value classes to the underlying type in runtime, but it is not guaranteed). A different approach was
-discussed where a refinement type is a subtype of the underlying type and has the same runtime representation. 
-Then some new syntax for defining a refinement type has to be introduced. For example:
+discussed where a refinement type is a subtype of the underlying type and has the same runtime representation.
+For comparison purposes, we will denote refinement types expressed in this alternative way as *refinement subtypes*.
+
+Some new syntax for defining a refinement type has to be introduced. For example:
 
 ```kotlin
 // satisfies is a new keyword
@@ -393,11 +395,11 @@ typealias RefinedT = T satisfies { <predicate> }
 typealias Pos = Int satisfies { it > 0 }
 ```
 
-All considerations of supported underlying types and refinement predicates from the proposed design apply here.
+All considerations of supported underlying types and refinement predicates from the refinement classes apply here.
 However, now we have no predefined execution semantics, so it has to be introduced.
-After analysis all refinement types should be erased to corresponding underlying types. 
-Instead of erasing predicate checks for correct conversions, 
-implementation should insert them where correctness was not deduced,
+After analysis all refinement subtypes should be erased to corresponding underlying types. 
+Instead of possibly eliminating predicate checks for correct conversions to refinement classes, 
+implementation now should insert them where correctness was not deduced for conversion to a refinement subtype,
 even if a refinement is not supported at all.
 
 ## Refining a value
@@ -420,8 +422,8 @@ val pos = v as PosExplicit
 ```
 
 For the case of implicit refining, usages of values with type `T` 
-(or some other refinement type with underlying type `T`) as values with the refinement type 
-should be analyzed statically instead of constructor calls. 
+(or some other refinement subtype with underlying type `T`) as values of the refinement subtype 
+should be analyzed statically instead of constructor calls for refinement classes. 
 For example:
 
 ```kotlin
@@ -434,11 +436,11 @@ if (v > 0) {
 ```
 
 Implicit refining makes code rather hard to manage. Subtle code change might make static analysis fail and suddenly
-introduce a runtime check where there was none, and it is not indicated by code. Or refining the type of function parameter
-might introduce runtime checks on all callsites.
+introduce a runtime check where there was none, and it is not indicated by code. 
+Or refining the type of function parameter might introduce runtime checks on all callsites.
 
-In the case of explicit refining, explicit conversions to a refinement type should be analyzed statically, much
-like in the proposed design.
+In the case of explicit refining, explicit conversions to a refinement subtype should be analyzed statically, 
+much like for refinement classes.
 For example:
 
 ```kotlin
@@ -452,24 +454,27 @@ if (v > 0) {
 } 
 ```
 
-Note that in this case refinements with empty predicate (constant `true`) would satisfy user request for `typetag`
+Note that in this case refinement subtypes with empty predicate (constant `true`) would satisfy user request for `typetag`
 (see [KT-75066](https://youtrack.jetbrains.com/issue/KT-75066/Feature-Request-typetag-Keyword-for-Compile-Time-Type-Safety)).
 
 ## Subtyping
 
-Subtyping on refinements is not trivial (see [Subtyping of refinements](#subtyping-of-refinements)), and in the current
-setting there are different (even non-orthogonal) ways to support it.
+Subtyping on refinements is not trivial (see [Subtyping of refinements](#subtyping-of-refinements)), 
+and for refinement subtypes there are different (even non-orthogonal) ways to support it.
 
-In the case of implicit refining, refinement types are implicitly compatible (with runtime checks), so they already 
+In the case of implicit refining, refinement subtypes are implicitly compatible (with runtime checks), so they already 
 act somewhat as subtypes of each other. However, the issue still arises at the level of types, see remark on
 bounded quantification in the [Disadvantages](#disadvantages) section.
 
-In the case of explicit refining, the situation is more interesting. We could exclude subtyping of refinements and 
-require explicit conversion between them just as for refining a value of the underlying type. Or else we could
-rely on predicate implication deduction capabilities of an implementation, effectively integrating it into the type system.
+In the case of explicit refining, the situation is more interesting. 
+We could exclude subtyping of refinement subtypes and require explicit conversion between them 
+just as for refining a value of the underlying type. 
+Or else we could rely on predicate implication deduction capabilities of an implementation, 
+effectively integrating it into the type system.
 
-In both cases, interpretation for refinements of refinements should be defined or explicitly prohibited.
-If supported, it allows extending nominal subtyping to refinements (similar to what Ada does, see [Related Work](#ada-language)).
+In both cases, interpretation for refinement subtypes of refinement subtypes should be defined or explicitly prohibited.
+If supported, it allows extending nominal subtyping to refinement subtypes 
+(similar to what Ada does, see [Related Work](#ada-language)).
 Subtype should combine inherited predicate with its own.
 For example:
 
@@ -480,8 +485,8 @@ typealias PosEven = Pos satisfies { it % 2 == 0 } // the actual predicate is `it
 
 ## Smartcasts
 
-In this setting, `is` might be supported for refinement types. Making `v is RefinedT` equivalent to `v is T && <predicate>(v)`
-would align refinement types and smartcasts (see also [Why not integrate with smartcasts?](#why-not-integrate-with-smartcasts)).
+We might support `is` for refinement subtypes. Making `v is RefinedT` equivalent to `v is T && <predicate>(v)`
+would align refinement subtypes and smartcasts (see also [Why not integrate with smartcasts?](#why-not-integrate-with-smartcasts)).
 For example:
 
 ```kotlin
@@ -494,7 +499,8 @@ if (v is Pos) { // same as `v is Int && v > 0`
 
 ## Operations
 
-This representation is also much more convenient for the user as a refinement inherits all operations from the underlying type.
+This representation is also much more convenient for the user as 
+a refinement subtype inherits all operations from the underlying type.
 An implementation might even automatically refine some of them, but the user can always do it manually with overloading.
 For example:
 
@@ -505,11 +511,11 @@ operator fun Pos.plus(other: Pos): Pos = (this as Int).plus(other) as Pos
 ## Disadvantages
 
 We did not pursue this approach for the following reasons:
-- While the proposed design builds on existing features, this approach requires new syntax and type system changes 
+- While the refinement classes are built on existing features, refinement subtypes require new syntax and type system changes 
 - It seems impossible to achieve such functionality with just a compiler plugin
-- If introduced, structural subtyping on refinement types does not fit well with Kotlin nominal subtyping
-- If introduced, implicit conversions between distinct refinement types would be against Kotlin preference for explicit conversions 
-- It is unclear how those types should interact with existing type system features. 
+- If introduced, structural subtyping on refinement subtypes does not fit well with Kotlin nominal subtyping
+- If introduced, implicit conversions between distinct refinement subtypes would be against Kotlin preference for explicit conversions 
+- It is unclear how refinement subtypes should interact with existing type system features. 
 For example, if structural subtyping is introduced, what types should be allowed for `T` in `fun <T : Pos> f(v: T): T`?
 Being a subtype of `Pos` is being at-least-as-strong refinement, 
 it means that to type check an application of `f` typesystem has to be able to reason about refinement predicate implications. 
