@@ -44,7 +44,7 @@ For example:
 ```kotlin
 fun <T> test(l: T, r: @NoInfer T) {}
 
-test("42", 42) // TYPE_MISMATCH
+test("42", 42) // [TYPE_MISMATCH]
 ```
 
 Without `@NoInfer`, `T` would be inferred to a common supertype of `String` and `Int`, 
@@ -90,9 +90,69 @@ Users describe similar use-case in `@NoInfer`-related issues
 force specifying the type parameter explicitly in DSL functions.
 
 This inspired us to propose [Explicit Type Parameters](#explicit-type-parameters).
-See corresponding section for more details.
+See the corresponding section for more details.
 
 ## `@Exact`
+
+`@Exact` is type annotation that forces inference to be exact for a type variable occurrence,
+even if subtyping or variance of a generic allow over- or under-approximation.
+For example:
+
+```kotlin
+class Out<out T>(val v: T)
+
+fun <T> test(o: Out<@Exact T>, v: T) {}
+
+val o: Out<String> = Out("42")
+test(o, 42) // [TYPE_MISMATCH]
+```
+
+Without `@Exact`, `T` would be inferred to a common supertype of `String` and `Int`, which is `Any`,
+because `out` variance of `Out` generic allows over-approximation of `T`.
+With `@Exact`, `T` has to be inferred exactly to the parameter 
+of `Out` instance provided on the call site, which is `String`.
+So an error is reported because `Int` is not a subtype of `String`.
+
+More technically, whenever a type variable occurrence annotated with `@Exact`
+generates a constraint `T <: S` (type variable can be on either side)
+the opposite constraint `S <: T` is added to the system too.
+
+### Usage
+
+In the standard library, `@Exact` is used only in one place:
+
+```kotlin
+fun <V, V1 : V> Map<in String, @Exact V>.getValue(thisRef: Any?, property: KProperty<*>): V1
+```
+
+It seems that the annotation was added to prevent the following erroneous usage:
+
+```kotlin
+val m: Map<String, Int> = mapOf("a" to 42)
+// `Map` is covariant in its value type, 
+// so `V` can be inferred to `Any` and `V1` to `String`
+val a: String by m // reading `a` would throw ClassCastException
+```
+
+However, current inference prefers to infer `V` to `Int` and `V1` to `Int & String` instead.
+Thus `V1` is inferred to an empty intersection type, which would become an error in the future
+([KTLC-101](https://youtrack.jetbrains.com/issue/KTLC-101/Deprecate-inferring-type-variables-into-an-empty-intersection-type)).
+So `@Exact` might not be needed here at all.
+
+In user code, `@Exact` is used primarly in DSLs to limit variance of a generic for some functions:
+
+```kotlin
+infix fun <V> KProperty<@Exact V>.ne(value: V) // not equal
+
+data class User(val name: String)
+
+User::name ne 42
+//            ^^ [ARGUMENT_TYPE_MISMATCH]
+// Would compile without `@Exact`, `V` would be inferred to `Any`
+```
+
+We believe `@Exact` can be made public as-is.
+See [Exact Type Variable Occurrences](#exact-type-variable-occurrences) for more details.
 
 ## `@OnlyInputTypes`
 
