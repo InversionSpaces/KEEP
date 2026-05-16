@@ -9,7 +9,7 @@
 # Abstract
 
 Kotlin has internal type and type parameter annotations
-which allow controlling type inference for a call.
+which allow controlling type inference for a function call.
 Based on analysis of problems those annotations solve 
 in the standard library and in user code,
 this document proposes to introduce publicly available
@@ -27,24 +27,81 @@ TODO
 
 # Introduction
 
-## Internal Annotations
+Kotlin has internal annotations that allow controlling type inference for a function call:
+`@kotlin.internal.NoInfer`, `@kotlin.internal.Exact` and `@kotlin.internal.OnlyInputTypes`.
+As they are internal, those annotations are intended to be used in the standard library.
+However, it is still possible to use them in user code even now, through workarounds.
 
-### `@NoInfer`
+The sections below describe each annotation in detail and
+showcase how they are used at the moment.
 
-### `@Exact`
+## `@NoInfer`
 
-### `@OnlyInputTypes`
+`@NoInfer` is a type annotation that prohibits using information
+from a type variable occurrence to infer this type variable.
+For example:
 
-## Use-Cases
+```kotlin
+fun <T> test(l: T, r: @NoInfer T) {}
+
+test("42", 42) // TYPE_MISMATCH
+```
+
+Without `@NoInfer`, `T` would be inferred to a common supertype of `String` and `Int`, 
+which is `Any`, and the call to `test` would compile.
+With `@NoInfer`, the type of second argument is not taken into account during inference,
+so `T` is inferred to `String` and an error is reported because `Int` is not a subtype of `String`.
+
+More technically, contraints originated from positions with `@NoInfer`
+are not considered proper during inference.
+This means that they do not participate in the fixation readiness check
+and type resolution for a type variable.
+However, they are used normally for incorporation and,
+as we have seen in the example above, type mismatch errors can be generated from them.
+
+### Usage
+
+In the standard library, `@NoInfer` is used for the following functions:
+
+```kotlin
+inline fun <reified R> Array<*>.filterIsInstance(): List<@kotlin.internal.NoInfer R>
+inline fun <reified R> Iterable<*>.filterIsInstance(): List<@kotlin.internal.NoInfer R>
+inline fun <reified R> Sequence<*>.filterIsInstance(): Sequence<@kotlin.internal.NoInfer R>
+
+inline fun <reified T> List<*>.castAll(): List<@kotlin.internal.NoInfer T>
+
+context(context: @NoInfer A)
+inline fun <A> contextOf(): @NoInfer A = context
+```
+
+Note that in each case `@NoInfer` is applied to all type variable occurrences,
+so there is no source of information for inference to work.
+Thus `@NoInfer` is used to force each caller to specify the type parameter explicitly:
+
+```kotlin
+val l1: List<CharSequence> = listOf()
+val l2: List<String> = l1.filterIsInstance()
+//                        ^^^^^^^^^^^^^^^^ [CANNOT_INFER_PARAMETER_TYPE]
+```
+
+Users describe similar use-case in `@NoInfer`-related issues 
+([KT-54642](https://youtrack.jetbrains.com/issue/KT-54642/Expose-NoInfer-annotation-and-design-it-for-public-use),
+[KT-54477](https://youtrack.jetbrains.com/issue/KT-54477/NoInfer-doesnt-work-for-builders)):
+force specifying the type parameter explicitly in DSL functions.
+
+This inspired us to propose [Explicit Type Parameters](#explicit-type-parameters).
+See corresponding section for more details.
+
+## `@Exact`
+
+## `@OnlyInputTypes`
 
 # Design
 
-## Explicit Type Arguments
+## Explicit Type Parameters
 
 ## Exact Type Variable Occurrences
 
 ## Comparable Type Bound
-
-
 
   
