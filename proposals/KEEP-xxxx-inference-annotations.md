@@ -205,9 +205,92 @@ We did not find any different use-case for `@OnlyInputTypes`,
 so we propose to replace it with [Comparable Type Bound](#comparable-type-bound).
 See the corresponding section for more details.
 
-# Design
+# Proposal
+
+The following sections describe motivation and design for
+features proposed to replace `@NoInfer`, `@Exact` and `@OnlyInputTypes` internal annotations.
 
 ## Explicit Type Parameters
+
+### Motivation
+
+Kotlin has type erasure runtime semantics for non-reified type parameters,
+and for a great part of Kotlin code typing is checking:
+it statically rejects unsafe code but does not affect runtime behavior.
+So a complex, based on heuristics and ever evolving type inference is acceptable:
+what concrete types are inferred does not affect execution.
+Ensuring types safely approximate the runtime behavior is a separate concern
+(see [Introduction / `@Exact` / Usage](#usage-1) `Map::getValue` example).
+This is why it is okay for a same expression `emptyList()` to have
+different types depending on the context:
+
+```kotlin
+fun takeInts(l: List<Int>) {}
+fun takeStrings(l: List<String>) {}
+
+takeInts(emptyList())
+takeStrings(emptyList())
+```
+
+In both cases, runtime behavior of `emptyList()` is the same: it returns an empty list.
+
+However, in some cases, types directly affect the runtime behavior,
+and thus they are an important part of the source code.
+In such situations, inferring types is rather undesirable.
+For example, it would be strange to infer type argument of `as`:
+
+```kotlin
+fun takeString(s: String) {}
+
+val cs: CharSequence = "42"
+takeString(cs as _)
+```
+
+For similar reasons, the standard library requires explicit type arguments
+for functions like `List.castAll` and `Iterable.filterIsInstance`,
+using `@NoInfer` internal annotation to enforce this requirement.
+
+The idea is also applicable to DSLs, where type arguments
+might be a proper part of the embedded language and should not be inferred.
+For example, take a dependency injection DSL:
+
+```kotlin
+module {
+    single<Service> { ServiceImpl(get()) }
+}
+```
+
+Explicitly provided type parameter `Service` is a part of the DSL here, 
+without it, the type of the dependency would be incorrectly inferred to `ServiceImpl`.
+
+### Design
+
+To serve for the use-cases above, we propose to introduce a type parameter annotation `@Explicit`,
+which disables type inference for a type parameter and forces the user to always specify it explicitly:
+
+```kotlin
+inline fun <@Explicit reified T> Collection<*>.castAll(): Collection<T>
+
+val l: List<CharSequence> = listOf()
+val ls: List<String> = l.castAll() // error, explicit type parameter is required
+val ls = l.castAll<String>() // ok
+```
+
+TODO:
+- Can a function have explicit and non-explicit type parameters?
+- If yes, is it allowed to omit non-explicit type parameters entirely (without using `_`)?
+
+#### Alternatives
+
+Note that most type parameters that should be explicit are already `reified` (one exception is `contextOf`).
+On the one hand, type parameter being `reified` implies that 
+its concrete static type affects runtime behavior, so it probably should be explicit.
+On the other hand, situations where one might want an explicit type parameter
+which is not `reified` seem to be rare (e.g. `Any?.unsafeCast(): T`).
+
+So an alternative to introducing a new `@Explicit` annotation is
+to develop a compiler or IDE diagnostic suggesting to specify `reified` 
+type parameter explicitly on a call site, possibly based on additional heuristics.
 
 ## Exact Type Variable Occurrences
 
