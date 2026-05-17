@@ -156,6 +156,55 @@ See [Exact Type Variable Occurrences](#exact-type-variable-occurrences) for more
 
 ## `@OnlyInputTypes`
 
+`@OnlyInputTypes` is a type parameter annotation 
+(in contrast to `@NoInfer` and `@Exact` which are type annotations)
+that constraints the inferred type to appear among input types,
+that is, types of the arguments, result type or explicitly specified type arguments.
+For example:
+
+```kotlin
+fun <@OnlyInputTypes T> test(l: T, r: T) {}
+
+test("42", 42) // [TYPE_INFERENCE_ONLY_INPUT_TYPES_ERROR]
+test("42", "42" as CharSequence)
+```
+
+For the first call, `T` is inferred to `Any` which
+does not appear among input types, `String` and `Int`.
+So an error is reported.
+For the second call, `T` is inferred to `CharSequence` which
+appears among input types, so no error is reported.
+
+More technically, `@OnlyInputTypes` enables a check for the annotated type variable,
+so that once it is fixed, it is ensured to be equal to at least one of the input types.
+
+### Usage
+
+In the standard library, `@OnlyInputTypes` is used for the following functions:
+
+```kotlin
+fun <@kotlin.internal.OnlyInputTypes T> Array<out T>.indexOf(element: T): Int
+fun <@kotlin.internal.OnlyInputTypes T> Iterable<T>.contains(element: T): Boolean
+fun <@kotlin.internal.OnlyInputTypes T> MutableCollection<out T>.remove(element: T): Boolean
+```
+
+The effect of `@OnlyInputTypes` here is that `element` argument should be
+as subtype of collections' element type or vice versa.
+This approximates a constraint that `element` and collections' element can be compared,
+thus prohibiting meaningless code like the following:
+
+```kotlin
+val l: List<String> = listOf()
+val r = l.contains(42) // [TYPE_INFERENCE_ONLY_INPUT_TYPES_ERROR]
+```
+
+In user code, `@OnlyInputTypes` is mostly applied in places where `@Exact` would be a better choice.
+It seems to be a result of both annotations being undocumented.
+
+We did not find any different use-case for `@OnlyInputTypes`,
+so we propose to replace it with [Comparable Type Bound](#comparable-type-bound).
+See the corresponding section for more details.
+
 # Design
 
 ## Explicit Type Parameters
