@@ -2,7 +2,7 @@
 
 * **Type**: Design Proposal
 * **Author**: Mikhail Vorobev
-* **Contributors**: Marat Akhin
+* **Contributors**: Marat Akhin, Alejandro Serrano Mena
 * **Status**: Draft
 * **Discussion**: TODO
 
@@ -294,6 +294,169 @@ type parameter explicitly on a call site, possibly based on additional heuristic
 
 ## Exact Type Variable Occurrences
 
+### Motivation
+
+DSLs in Kotlin often include generic classes with natural variance (oftentimes covariance).
+But it poses a challenge while defining composition extensions for such classes.
+For example:
+
+```kotlin
+sealed interface Expr<out T>
+
+fun <T> Expr<T>.notEqual(other: Expr<T>): Expr<Boolean>
+
+val ei: Expr<Int> = TODO()
+val es: Expr<String> = TODO()
+val eb: Expr<Boolean> = ei.notEqual(es) // compiles
+```
+
+Here, covariance of `Expr` allows to overapproximate `T` to `Any`
+so a call to `notEqual` type checks, but it is probably undesirable.
+Note that this is due to receiver of type `Expr<T>` 
+being treated as a general function argument.
+If we defined `notEqual` as a member function,
+there would not be such a problem:
+
+```kotlin
+sealed interface Expr<out T> {
+    fun notEqual(other: Expr<T>): Expr<Boolean>
+}
+
+val ei: Expr<Int> = TODO()
+val es: Expr<String> = TODO()
+val eb: Expr<Boolean> = ei.notEqual(es)
+//         [ARGUMENT_TYPE_MISMATCH] ^^
+```
+
+But there are problems with this approach:
+- The generic might reside in another module, possibly outside of developers’ control (e.g. `KProperty`).
+- The generic cannot stay covariant because the type parameter is used in the argument, which is a contravariant position.
+
+### Design
+
+We propose to make internal `@Exact` annotation public to serve the use-case above.
+The annotation forces an equivalence constraint instead of 
+a subtype constraint for a type variable on the annotated position.
+See [Introduction / `@Exact`](#exact) for more details.
+It would allow DSL authors to "fix" or "bind" a type variable 
+in the receiver type, prohibiting over- or under-approximation:
+
+```kotlin
+fun <T> Expr<@Exact T>.notEqual(other: Expr<T>): Expr<Boolean>
+
+val ei: Expr<Int> = TODO()
+val es: Expr<String> = TODO()
+// `T` is inferred exactly to `Int` due to `@Exact` annotation
+val eb: Expr<Boolean> = ei.notEqual(es)
+//         [ARGUMENT_TYPE_MISMATCH] ^^
+```
+
+One problem with this approach is that it makes methods like
+`notEqual` non-symmetric, while semantically they are symmetric:
+
+```kotlin
+val ecs: Expr<CharSequence> = TODO()
+val es: Expr<String> = TODO()
+val eb1: Expr<Boolean> = ecs.notEqual(es) // ok
+val eb2: Expr<Boolean> = es.notEqual(ecs)
+//          [ARGUMENT_TYPE_MISMATCH] ^^^
+// `CharSequence` is not a subtype of `String`
+```
+
+#### Alternatives
+
+##### `@OnlyInputTypes` annotation
+
+As mentioned above, adding `@Exact` to a receiver parameter might make an extension non-symmetric.
+Using `@OnlyInputTypes` instead might make the situation better,
+as it makes signature more flexible, while still preventing over- or under-approximation.
+A viable mental model for `@OnlyInputTypes T` is "`T` is exact (in terms of `@Exact`) at least one occurrence":
+
+```kotlin
+fun <T> Expr<@OnlyInputTypes T>.notEqual(other: Expr<T>): Expr<Boolean>
+
+val ecs: Expr<CharSequence> = TODO()
+val es: Expr<String> = TODO()
+val ei: Expr<Int> = TODO()
+val eb1: Expr<Boolean> = ecs.notEqual(es) // ok
+val eb2: Expr<Boolean> = es.notEqual(ecs) // ok
+val eb3: Expr<Boolean> = ei.notEqual(es) // [TYPE_INFERENCE_ONLY_INPUT_TYPES_ERROR]
+```
+
+So it is possible to stabilize `@OnlyInputTypes` to cover this use-case instead of `@Exact`.
+However, our conversations with users indicate that:
+- Flexibility of `@OnlyInputTypes` is not always desired, 
+  binding a type variable exactly in the receiver is a better semantic fit.
+- DSLs rarely include non-trivial subtyping hierarchies 
+  where the `@OnlyInputTypes` flexibility is of any use.
+- Using `@Exact` makes funtion signature easier to interpret
+  and allows the compiler to generate better error messages.
+
+#### Bound Extensions
+
+Note that it is possible to "simulate" adding a member function to a class,
+avoiding over- or under-approximation which happens with extensions:
+
+```kotlin
+sealed interface Expr<out T>
+
+class Inv<T>(val e: Expr<T>) {
+    fun notEqual(other: Expr<T>): Expr<Boolean>
+}
+
+val ei: Expr<Int> = TODO()
+val es: Expr<String> = TODO()
+val eb1: Expr<Boolean> = Inv(ei).notEqual(es)
+//               [ARGUMENT_TYPE_MISMATCH] ^^
+val eb2: Expr<Boolean> = Inv(es).notEqual(es) // ok
+```
+
+We could introduce `bound` extensions for which inference would work in a similar way:
+type variables in the receiver would be inferred in a separate session,
+before taking information from the rest of the arguments into account:
+
+```kotlin
+sealed interface Expr<out T>
+
+bound fun <T> Expr<T>.notEqual(other: Expr<T>): Expr<Boolean>
+
+val ei: Expr<Int> = TODO()
+val es: Expr<String> = TODO()
+val eb1: Expr<Boolean> = ei.notEqual(es)
+//          [ARGUMENT_TYPE_MISMATCH] ^^
+// `T` is inferred to `Int` from the receiver, 
+// the argument is typechecked against `T = Int`
+val eb2: Expr<Boolean> = es.notEqual(es) // ok
+```
+
+However, this approach seems less explicit than `@Exact` and
+more demanding implementation-wise, while achieving the same result.
+
+#### Bound Class Type Parameters
+
+Instead of applying `@Exact` or `bound` modifier on each particular extension,
+we can allow DSL-related generic classes change inference for all extensions on them.
+We could introduce `@ReceiverBound` annotation for type parameters that
+would have the same effect as if `@Exact` was applied to this parameter on all extensions:
+
+```kotlin
+sealed interface Expr<@ReceiverBound out T>
+
+fun <T> Expr</*@Exact*/ T>.notEqual(other: Expr<T>): Expr<Boolean>
+
+val ei: Expr<Int> = TODO()
+val es: Expr<String> = TODO()
+val eb1: Expr<Boolean> = ei.notEqual(es)
+//          [ARGUMENT_TYPE_MISMATCH] ^^
+val eb2: Expr<Boolean> = es.notEqual(es) // ok
+```
+
+However, this approach has the following disadvantages:
+- Sometimes DSLs use classes they do not control, e.g. `KProperty`,
+  so the annotation could not be put in the class declaration.
+- Users might still want to write extensions over DSL classes, and they would expect them to work as usual.
+- It is not as granular as `@Exact` is. It is also less local, 
+  as it affects inference for code detached from the site of its application.
+
 ## Comparable Type Bound
 
-  
