@@ -52,7 +52,7 @@ which is `Any`, and the call to `test` would compile.
 With `@NoInfer`, the type of second argument is not taken into account during inference,
 so `T` is inferred to `String` and an error is reported because `Int` is not a subtype of `String`.
 
-More technically, contraints originated from positions with `@NoInfer`
+More technically, constraints originated from positions with `@NoInfer`
 are not considered proper during inference.
 This means that they do not participate in the fixation readiness check
 and type resolution for a type variable.
@@ -70,8 +70,8 @@ inline fun <reified R> Sequence<*>.filterIsInstance(): Sequence<@kotlin.internal
 
 inline fun <reified T> List<*>.castAll(): List<@kotlin.internal.NoInfer T>
 
-context(context: @NoInfer A)
-inline fun <A> contextOf(): @NoInfer A = context
+context(context: @kotlin.internal.NoInfer A)
+inline fun <A> contextOf(): @kotlin.internal.NoInfer A = context
 ```
 
 Note that in each case `@NoInfer` is applied to all type variable occurrences,
@@ -94,7 +94,7 @@ See the corresponding section for more details.
 
 ## `@Exact`
 
-`@Exact` is type annotation that forces inference to be exact for a type variable occurrence,
+`@Exact` is a type annotation that forces inference to be exact for a type variable occurrence,
 even if subtyping or variance of a generic allow over- or under-approximation.
 For example:
 
@@ -139,7 +139,7 @@ Thus `V1` is inferred to an empty intersection type, which would become an error
 ([KTLC-101](https://youtrack.jetbrains.com/issue/KTLC-101/Deprecate-inferring-type-variables-into-an-empty-intersection-type)).
 So `@Exact` might not be needed here at all.
 
-In user code, `@Exact` is used primarly in DSLs to limit variance of a generic for some functions:
+In user code, `@Exact` is used primarily in DSLs to limit variance of a generic for some functions:
 
 ```kotlin
 infix fun <V> KProperty<@Exact V>.ne(value: V) // not equal
@@ -158,7 +158,7 @@ See [Exact Type Variable Occurrences](#exact-type-variable-occurrences) for more
 
 `@OnlyInputTypes` is a type parameter annotation 
 (in contrast to `@NoInfer` and `@Exact` which are type annotations)
-that constraints the inferred type to appear among input types,
+that constrains the inferred type to appear among input types,
 that is, types of the arguments, result type or explicitly specified type arguments.
 For example:
 
@@ -189,7 +189,7 @@ fun <@kotlin.internal.OnlyInputTypes T> MutableCollection<out T>.remove(element:
 ```
 
 The effect of `@OnlyInputTypes` here is that `element` argument should be
-as subtype of collections' element type or vice versa.
+a subtype of collections' element type or vice versa.
 This approximates a constraint that `element` and collections' element can be compared,
 thus prohibiting meaningless code like the following:
 
@@ -215,8 +215,8 @@ features proposed to replace `@NoInfer`, `@Exact` and `@OnlyInputTypes` internal
 ### Motivation
 
 Kotlin has type erasure runtime semantics for non-reified type parameters,
-and for a great part of Kotlin code typing is checking:
-it statically rejects unsafe code but does not affect runtime behavior.
+and for most Kotlin code, types are only used as a safety check:
+they statically reject unsafe code but do not affect runtime behavior.
 So a complex, based on heuristics and ever evolving type inference is acceptable:
 what concrete types are inferred does not affect execution.
 Ensuring types safely approximate the runtime behavior is a separate concern
@@ -261,7 +261,7 @@ module {
 ```
 
 Explicitly provided type parameter `Service` is a part of the DSL here, 
-without it, the type of the dependency would be incorrectly inferred to `ServiceImpl`.
+without it, the type of the dependency would be inferred to `ServiceImpl` instead of `Service`.
 
 ### Design
 
@@ -310,8 +310,8 @@ val es: Expr<String> = TODO()
 val eb: Expr<Boolean> = ei.notEqual(es) // compiles
 ```
 
-Here, covariance of `Expr` allows to overapproximate `T` to `Any`
-so a call to `notEqual` type checks, but it is probably undesirable.
+Here, covariance of `Expr` allows over-approximating `T` to `Any`,
+so the call to `notEqual` typechecks, but this is probably undesirable.
 Note that this is due to receiver of type `Expr<T>` 
 being treated as a general function argument.
 If we defined `notEqual` as a member function,
@@ -389,10 +389,10 @@ However, our conversations with users indicate that:
   binding a type variable exactly in the receiver is a better semantic fit.
 - DSLs rarely include non-trivial subtyping hierarchies 
   where the `@OnlyInputTypes` flexibility is of any use.
-- Using `@Exact` makes funtion signature easier to interpret
+- Using `@Exact` makes function signature easier to interpret
   and allows the compiler to generate better error messages.
 
-#### Bound Extensions
+##### Bound Extensions
 
 Note that it is possible to "simulate" adding a member function to a class,
 avoiding over- or under-approximation which happens with extensions:
@@ -432,7 +432,7 @@ val eb2: Expr<Boolean> = es.notEqual(es) // ok
 However, this approach seems less explicit than `@Exact` and
 more demanding implementation-wise, while achieving the same result.
 
-#### Bound Class Type Parameters
+##### Bound Class Type Parameters
 
 Instead of applying `@Exact` or `bound` modifier on each particular extension,
 we can allow DSL-related generic classes change inference for all extensions on them.
@@ -513,7 +513,7 @@ l.indexOfFirst { it == b }
 
 Note that languages with typeclasses would solve this by decoupling the types
 constraining them with an instance of `Eq` typeclass,
-soomething along the lines of:
+something along the lines of:
 
 ```kotlin
 fun <S, T> List<T>.indexOf(element: S)(using Eq[S, T]): Int
@@ -545,7 +545,8 @@ open class B : I
 
 val la: List<A> = listOf(A())
 val b: B = B()
-l.indexOf(b) // compiles (`A` can override `equals`)
+la.indexOf(b) // compiles 
+// `A` and `B` can override equals and be comparable
 ```
 
 However, note that type inference should take this "equitable" bound into account,
