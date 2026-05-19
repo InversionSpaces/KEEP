@@ -23,7 +23,32 @@ In particular, we propose to introduce:
 
 # Table of Contents
 
-TODO
+- [Abstract](#abstract)
+- [Introduction](#introduction)
+  - [`@NoInfer`](#noinfer)
+    - [Description](#description)
+    - [Usage](#usage)
+  - [`@Exact`](#exact)
+    - [Description](#description-1)
+    - [Usage](#usage-1)
+  - [`@OnlyInputTypes`](#onlyinputtypes)
+    - [Description](#description-2)
+    - [Usage](#usage-2)
+- [Proposal](#proposal)
+  - [Explicit Type Parameters](#explicit-type-parameters)
+    - [Motivation](#motivation)
+    - [Design](#design)
+    - [Alternatives](#alternatives)
+  - [Exact Type Variable Occurrences](#exact-type-variable-occurrences)
+    - [Motivation](#motivation-1)
+    - [Design](#design-1)
+    - [Alternatives](#alternatives-1)
+      - [`@OnlyInputTypes` annotation](#onlyinputtypes-annotation)
+      - [Bound Extensions](#bound-extensions)
+      - [Bound Class Type Parameters](#bound-class-type-parameters)
+  - [Equitable Type Bound](#equitable-type-bound)
+    - [Motivation](#motivation-2)
+    - [Design](#design-2)
 
 # Introduction
 
@@ -36,6 +61,8 @@ The sections below describe each annotation in detail and
 showcase how they are used at the moment.
 
 ## `@NoInfer`
+
+### Description
 
 `@NoInfer` is a type annotation that prohibits using information
 from a type variable occurrence to infer this type variable.
@@ -93,6 +120,8 @@ This inspired us to propose [Explicit Type Parameters](#explicit-type-parameters
 See the corresponding section for more details.
 
 ## `@Exact`
+
+### Description
 
 `@Exact` is a type annotation that forces inference to be exact for a type variable occurrence,
 even if subtyping or variance of a generic allow over- or under-approximation.
@@ -155,6 +184,8 @@ We believe `@Exact` can be made public as-is.
 See [Exact Type Variable Occurrences](#exact-type-variable-occurrences) for more details.
 
 ## `@OnlyInputTypes`
+
+### Description
 
 `@OnlyInputTypes` is a type parameter annotation 
 (in contrast to `@NoInfer` and `@Exact` which are type annotations)
