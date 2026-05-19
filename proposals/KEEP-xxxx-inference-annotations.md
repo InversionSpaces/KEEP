@@ -550,7 +550,9 @@ la.indexOf(b) // compiles
 ```
 
 However, note that type inference should take this "equitable" bound into account,
-because with the new signature there might be not enough information to infer types otherwise:
+because with the new signature there might be not enough information to infer types
+where they could be inferred before.
+For example:
 
 ```kotlin
 fun <S, T> List<S>.indexOf(element: T): Int /*where S == T*/
@@ -559,3 +561,8 @@ val l: List<List<String>> = emptyList()
 l.indexOf(emptyList()) // [CANNOT_INFER_PARAMETER_TYPE] 
 // Cannot infer type for type parameter 'T'.
 ```
+
+On the other hand, this limitation is not specific to the proposed "equitable" bound.
+Similar inference failures already occur today when
+an otherwise unconstrained type parameter is needed only to type-check an argument.
+See, for example, [KT-2656](https://youtrack.jetbrains.com/issue/KT-2656/Infer-unknown-type-parameter-if-its-not-used-in-return-type).
