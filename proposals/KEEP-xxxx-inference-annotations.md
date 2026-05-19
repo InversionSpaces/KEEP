@@ -18,7 +18,7 @@ In particular, we propose to introduce:
 - Explicit type arguments that are never inferred and have to be specified explicitly on each call site.
 - Exact type variable occurrences that force a type variable to be inferred exactly,
   prohibiting over- or under-approximation even if variance or subtyping allow it.
-- "Comparable" type bound on two type parameters to express that
+- "Equitable" type bound on two type parameters to express that
   a function compares values of type parameters types.
 
 # Table of Contents
@@ -202,7 +202,7 @@ In user code, `@OnlyInputTypes` is mostly applied in places where `@Exact` would
 It seems to be a result of both annotations being undocumented.
 
 We did not find any different use-case for `@OnlyInputTypes`,
-so we propose to replace it with [Comparable Type Bound](#comparable-type-bound).
+so we propose to replace it with [Equitable Type Bound](#equitable-type-bound).
 See the corresponding section for more details.
 
 # Proposal
@@ -458,5 +458,103 @@ However, this approach has the following disadvantages:
 - It is not as granular as `@Exact` is. It is also less local, 
   as it affects inference for code detached from the site of its application.
 
-## Comparable Type Bound
+## Equitable Type Bound
 
+### Motivation
+
+Kotlin implements equality `==` through `equals(Any?)` method, so equality in Kotlin is not type-safe:
+value of any type can be compared to a value of any other type, meaningfully or not.
+There are various efforts from IDE and language sides to improve type safety for equality,
+see, for example, [More specific `equals` operator](KEEP-0456-equals.md).
+
+However, those improvements do not transfer to polymorphic functions 
+which perform equality comparison internally.
+For example:
+
+```kotlin
+fun <S, T> test(a: S, b: T): Boolean = a == b
+
+val r = "42" == 42 // [EQUALITY_NOT_APPLICABLE]
+test("42", 42) // compiles
+```
+
+To mitigate this, the standard library uses only one type parameter
+and applies `@OnlyInputTypes` annotation to it.
+For example:
+
+```kotlin
+fun <@kotlin.internal.OnlyInputTypes T> List<T>.indexOf(element: T): Int
+
+val l: List<String> = listOf("42")
+l.indexOf(42) // [TYPE_INFERENCE_ONLY_INPUT_TYPES_ERROR]
+l.indexOf("42") // compiles
+```
+
+Note that without `@OnlyInputTypes` annotation, the first call would compile,
+type parameter `T` would be inferred to `Any`, which covariance of `List` allows.
+The annotation essentially forces the type of the `element` argument
+to be a subtype of the list element type, or vice versa.
+See [Introduction / `@OnlyInputTypes`](#onlyinputtypes) for more details.
+
+This creates an inconsistency: 
+the two calls below are semantically equivalent,
+but the first one does not compile:
+
+```kotlin
+interface I
+open class A : I
+open class B : I
+
+val l: List<A> = listOf(A())
+val b: B = B()
+l.indexOf(b) // [TYPE_INFERENCE_ONLY_INPUT_TYPES_ERROR]
+l.indexOfFirst { it == b }
+```
+
+Note that languages with typeclasses would solve this by decoupling the types
+constraining them with an instance of `Eq` typeclass,
+soomething along the lines of:
+
+```kotlin
+fun <S, T> List<T>.indexOf(element: S)(using Eq[S, T]): Int
+```
+
+### Design
+
+We propose to introduce an "equitable" bound for polymorphic functions
+for expressing that a function relies on equality comparison for two types,
+so that `List.indexOf` signature could be changed to the following:
+
+```kotlin
+fun <S, T> List<S>.indexOf(element: T): Int where S == T
+```
+
+Decoupling type parameters like this allows more precise inference,
+and expressing "equitable" type bound in the signature allows
+the compiler or IDE to provide better diagnostics on call sites.
+For example:
+
+```kotlin
+val l: List<String> = listOf("42")
+l.indexOf(42) // [EQUALITY_NOT_APPLICABLE] 
+// Operator '==' cannot be applied to 'String' and 'Int'.
+
+interface I
+open class A : I
+open class B : I
+
+val la: List<A> = listOf(A())
+val b: B = B()
+l.indexOf(b) // compiles (`A` can override `equals`)
+```
+
+However, note that type inference should take this "equitable" bound into account,
+because with the new signature there might be not enough information to infer types otherwise:
+
+```kotlin
+fun <S, T> List<S>.indexOf(element: T): Int /*where S == T*/
+
+val l: List<List<String>> = emptyList()
+l.indexOf(emptyList()) // [CANNOT_INFER_PARAMETER_TYPE] 
+// Cannot infer type for type parameter 'T'.
+```
